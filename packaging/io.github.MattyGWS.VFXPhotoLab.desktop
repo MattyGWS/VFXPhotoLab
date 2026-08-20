@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=VFX Photo Lab
+Comment=Non-destructive photo editor
+Exec=VFXPhotoLab %F
+Icon=io.github.MattyGWS.VFXPhotoLab
+Categories=Graphics;Photography;
+MimeType=image/png;image/jpeg;image/bmp;image/tiff;image/webp;
+Terminal=false
+StartupWMClass=VFX Photo Lab

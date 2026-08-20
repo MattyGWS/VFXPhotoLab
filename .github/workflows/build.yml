@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: linux_gcc_64
+          - os: windows-2022
+            arch: win64_msvc2022_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          arch: ${{ matrix.arch }}
+          modules: 'qtimageformats'
+          cache: true
+
+      - name: Fetch pinned wgpu-native (Linux)
+        if: runner.os == 'Linux'
+        run: ./scripts/fetch-wgpu-native.sh
+
+      - name: Fetch pinned wgpu-native (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/fetch-wgpu-native.ps1
+
+      - name: Configure
+        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build-ci --parallel
+
+      - name: Test
+        run: ctest --test-dir build-ci --output-on-failure
+
+      - name: Install portable tree
+        run: cmake --install build-ci --prefix dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VFXPhotoLab-${{ runner.os }}
+          path: dist

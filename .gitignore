@@ -1,69 +1,34 @@
-# Prerequisites
-*.d
+# Build outputs
+/build/
+/build-*/
+/out/
+/dist/
+CMakeUserPresets.json
 
-# Compiled Object files
-*.slo
-*.lo
+# IDEs
+.vscode/
+.idea/
+*.user
+*.user.*
+
+# Compilers and debuggers
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
 *.pdb
-
-# Compiled Dynamic libraries
+*.ilk
+*.exe
+*.dll
 *.so
 *.dylib
-*.dll
-*.so.*
 
+# OS files
+.DS_Store
+Thumbs.db
 
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# Build directories
-build/
-Build/
-build-*/
-
-# CMake generated files
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-install_manifest.txt
-compile_commands.json
-
-# Temporary files
+# VFX Photo Lab temporary and recovery files
+*.vfxphoto.autosave
 *.tmp
-*.log
-*.bak
-*.swp
 
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
-.cache/
+# Optional local wgpu-native SDK (keep only its placement notes)
+/third_party/wgpu-native/*
+!/third_party/wgpu-native/README.md

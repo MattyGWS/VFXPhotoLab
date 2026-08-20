@@ -1,0 +1,4 @@
+TITLE "Extended Range"
+LUT_1D_SIZE 2
+-0.25 0 0
+1.25 1 1

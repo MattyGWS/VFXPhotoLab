@@ -1,0 +1,420 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "name": "identity-1d",
+      "fixture": "identity_1d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.0,
+            0.25,
+            1.0
+          ],
+          "expected": [
+            0.0,
+            0.25,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            0.125,
+            0.5,
+            0.875
+          ],
+          "expected": [
+            0.125,
+            0.5,
+            0.875
+          ]
+        }
+      ]
+    },
+    {
+      "name": "identity-3d",
+      "fixture": "identity_3d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.2,
+            0.45,
+            0.8
+          ],
+          "expected": [
+            0.2,
+            0.45,
+            0.8
+          ]
+        },
+        {
+          "input": [
+            1.0,
+            0.0,
+            0.5
+          ],
+          "expected": [
+            1.0,
+            0.0,
+            0.5
+          ]
+        }
+      ]
+    },
+    {
+      "name": "asymmetric-red-fastest-lattice",
+      "fixture": "asymmetric_lattice_order_3d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "expected": [
+            0.0,
+            0.01,
+            0.02
+          ]
+        },
+        {
+          "input": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "expected": [
+            0.1,
+            0.11,
+            0.12
+          ]
+        },
+        {
+          "input": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "expected": [
+            0.2,
+            0.21,
+            0.22
+          ]
+        },
+        {
+          "input": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "expected": [
+            0.4,
+            0.41,
+            0.42
+          ]
+        },
+        {
+          "input": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "expected": [
+            0.7,
+            0.71,
+            0.72
+          ]
+        }
+      ]
+    },
+    {
+      "name": "red-blue-swap",
+      "fixture": "red_blue_swap_3d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.1,
+            0.4,
+            0.9
+          ],
+          "expected": [
+            0.9,
+            0.4,
+            0.1
+          ]
+        },
+        {
+          "input": [
+            0.75,
+            0.25,
+            0.5
+          ],
+          "expected": [
+            0.5,
+            0.25,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "name": "invert",
+      "fixture": "invert_1d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.0,
+            0.25,
+            1.0
+          ],
+          "expected": [
+            1.0,
+            0.75,
+            0.0
+          ]
+        },
+        {
+          "input": [
+            0.1,
+            0.4,
+            0.9
+          ],
+          "expected": [
+            0.9,
+            0.6,
+            0.1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "isolate-red",
+      "fixture": "isolate_red_3d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.1,
+            0.4,
+            0.9
+          ],
+          "expected": [
+            0.1,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "input": [
+            0.75,
+            0.25,
+            0.5
+          ],
+          "expected": [
+            0.75,
+            0.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "clamp-range-remap",
+      "fixture": "clamp_range_remap_1d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.0,
+            0.5,
+            1.0
+          ],
+          "expected": [
+            0.0,
+            0.5,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            0.25,
+            0.375,
+            0.75
+          ],
+          "expected": [
+            0.0,
+            0.25,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "non-default-domain-3d",
+      "fixture": "non_default_domain_3d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            -1.0,
+            0.0,
+            4.0
+          ],
+          "expected": [
+            0.0,
+            0.5,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            0.0,
+            -2.0,
+            0.0
+          ],
+          "expected": [
+            0.5,
+            0.0,
+            0.5
+          ]
+        }
+      ]
+    },
+    {
+      "name": "combined-shaper-cube",
+      "fixture": "combined_shaper_swap_3d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.2,
+            0.4,
+            0.6
+          ],
+          "expected": [
+            0.3,
+            0.2,
+            0.1
+          ]
+        },
+        {
+          "input": [
+            1.0,
+            0.5,
+            0.0
+          ],
+          "expected": [
+            0.0,
+            0.25,
+            0.5
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stepped-1d-samples",
+      "fixture": "stepped_1d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.3333333333,
+            0.3333333333,
+            0.3333333333
+          ],
+          "expected": [
+            0.0,
+            0.5,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            0.6666666667,
+            0.6666666667,
+            0.6666666667
+          ],
+          "expected": [
+            1.0,
+            0.5,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stepped-3d-samples",
+      "fixture": "stepped_3d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.5,
+            0.0,
+            1.0
+          ],
+          "expected": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            1.0,
+            0.5,
+            0.0
+          ],
+          "expected": [
+            1.0,
+            0.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "extended-output-low",
+      "fixture": "extended_range_1d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            0.0,
+            0.5,
+            1.0
+          ],
+          "expected": [
+            -0.25,
+            0.5,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "extended-output-high",
+      "fixture": "extended_range_1d.cube",
+      "mode": "matches-current",
+      "vectors": [
+        {
+          "input": [
+            1.0,
+            0.5,
+            0.0
+          ],
+          "expected": [
+            1.25,
+            0.5,
+            0.0
+          ]
+        }
+      ]
+    }
+  ]
+}

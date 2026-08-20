@@ -1,0 +1,7 @@
+https://github.com/GNOME/gimp
+
+https://www.photopea.com/
+https://github.com/KDE/krita
+
+https://github.com/MattyGWS/VFXTextureLab
+https://github.com/MattyGWS/VFXTextureLab/blob/main/vfx_texture_lab/theme.py

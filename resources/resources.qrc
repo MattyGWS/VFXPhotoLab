@@ -1,0 +1,42 @@
+<RCC>
+    <qresource prefix="/">
+        <file>app-icon.png</file>
+        <file>icons/transform.png</file>
+        <file>icons/select-rectangle.png</file>
+        <file>icons/select-ellipse.png</file>
+        <file>icons/select-freehand-lasso.png</file>
+        <file>icons/select-polygonal-lasso.png</file>
+        <file>icons/brush.png</file>
+        <file>icons/eraser.png</file>
+        <file>icons/crop.png</file>
+        <file>icons/clone-stamp.png</file>
+        <file>icons/healing-brush.png</file>
+        <file>icons/spot-healing.png</file>
+        <file>icons/patch.png</file>
+        <file>icons/dodge.png</file>
+        <file>icons/burn.png</file>
+        <file>icons/sponge.png</file>
+        <file>icons/blur.png</file>
+        <file>icons/sharpen.png</file>
+        <file>icons/smudge.png</file>
+        <file>icons/fill.png</file>
+        <file>icons/gradient.png</file>
+        <file>icons/shape-rectangle.png</file>
+        <file>icons/shape-rounded-rectangle.png</file>
+        <file>icons/shape-ellipse.png</file>
+        <file>icons/shape-line.png</file>
+        <file>icons/shape-polygon.png</file>
+        <file>icons/shape-star.png</file>
+        <file>icons/shape-arrow.png</file>
+        <file>icons/pen.png</file>
+        <file>icons/direct-selection.png</file>
+        <file>icons/corner-tool.png</file>
+        <file>icons/eyedropper.png</file>
+        <file>icons/text.png</file>
+        <file>icons/image-layer.png</file>
+        <file alias="shaders/brush_stamp.wgsl">../shaders/brush_stamp.wgsl</file>
+        <file alias="shaders/composite_tile.wgsl">../shaders/composite_tile.wgsl</file>
+        <file alias="shaders/pass_through_mix.wgsl">../shaders/pass_through_mix.wgsl</file>
+        <file alias="shaders/transform_preview.wgsl">../shaders/transform_preview.wgsl</file>
+    </qresource>
+</RCC>

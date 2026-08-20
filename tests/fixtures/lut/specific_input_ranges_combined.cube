@@ -1,0 +1,15 @@
+TITLE "Specific 1D and 3D input ranges"
+LUT_1D_SIZE 2
+LUT_3D_SIZE 2
+LUT_1D_INPUT_RANGE -2 2
+LUT_3D_INPUT_RANGE 0 1
+0 0 0
+1 1 1
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1

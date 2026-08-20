@@ -1,0 +1,12 @@
+# Non-linear 2x2x2 fixture whose interior differs under trilinear and
+# tetrahedral interpolation. Cube row order is red-fastest.
+TITLE "Interpolation Probe"
+LUT_3D_SIZE 2
+0.00 0.00 0.00
+1.00 0.00 0.00
+0.00 1.00 0.00
+1.00 1.00 0.25
+0.00 0.00 1.00
+1.00 0.25 1.00
+0.25 1.00 1.00
+1.00 1.00 1.00

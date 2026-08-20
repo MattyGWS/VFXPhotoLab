@@ -1,0 +1,7 @@
+#pragma once
+
+namespace vfx::gpu_shader {
+
+inline constexpr char DisplayColourTransform[] = R"VFXWGSL(@VFXPHOTOLAB_DISPLAY_COLOUR_SHADER_SOURCE@)VFXWGSL";
+
+} // namespace vfx::gpu_shader

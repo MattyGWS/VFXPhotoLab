@@ -1,0 +1,7 @@
+#pragma once
+
+namespace vfx::gpu_shader {
+
+inline constexpr char AdjustmentTile[] = R"VFXWGSL(@VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE@)VFXWGSL";
+
+} // namespace vfx::gpu_shader

@@ -1,0 +1,5 @@
+#pragma once
+
+namespace vfx::gpu_shader {
+inline constexpr char VectorFeather[] = R"WGSL(@VFXPHOTOLAB_VECTOR_FEATHER_SHADER_SOURCE@)WGSL";
+}

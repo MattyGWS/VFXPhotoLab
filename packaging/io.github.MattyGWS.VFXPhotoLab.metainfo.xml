@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.MattyGWS.VFXPhotoLab</id>
+  <name>VFX Photo Lab</name>
+  <summary>Non-destructive photo editor for Linux and Windows</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>VFX Photo Lab is a free and open-source photo editor built around a canvas, adjustment layers, reusable projects and responsive large-image processing.</p>
+  </description>
+  <launchable type="desktop-id">io.github.MattyGWS.VFXPhotoLab.desktop</launchable>
+  <provides>
+    <binary>VFXPhotoLab</binary>
+  </provides>
+  <releases>
+    <release version="0.13.0g.5" date="2026-08-05">
+      <description><p>Aligns the primary/secondary colour pair and turns the swap/default corner gaps into clean chrome-free action targets.</p></description>
+    </release>
+    <release version="0.13.0g.4" date="2026-08-05">
+      <description><p>Gives every toolbar and vector-shape tool a dedicated replaceable 24 × 24 icon resource, including Line and Arrow placeholders.</p></description>
+    </release>
+    <release version="0.13.0g.3" date="2026-08-05">
+      <description><p>Adds pixel-boundary whole-layer transforms and asynchronously prepared transform previews for immediate repeated gestures.</p></description>
+    </release>
+    <release version="0.13.0g.2" date="2026-08-05">
+      <description><p>Adds a shared snapping toggle, half-pixel guide placement and pixel-boundary vector geometry.</p></description>
+    </release>
+    <release version="0.13.0g" date="2026-08-05">
+      <description>
+        <p>Completes adjustment expansion with Curves and Hue/Saturation on-image sampling, Gradient Map editing improvements, bounded multicore exact histograms and multi-document interaction hardening.</p>
+      </description>
+    </release>
+    <release version="0.13.0f" date="2026-08-05">
+      <description><p>Adds Surface Blur, angle-aware Motion Blur and bounded Spin/Zoom Radial Blur with anisotropic tiled dependencies and deterministic multicore references.</p></description>
+    </release>
+    <release version="0.13.0e.1" date="2026-08-05">
+      <description><p>Fixes the Fedora build by removing a duplicate internal smooth-step helper while preserving all 0.13.0e effects and schemas.</p></description>
+    </release>
+    <release version="0.13.0e" date="2026-08-05">
+      <description><p>Adds document-relative Vignette, creative RGB Split and manual radial chromatic-aberration correction adjustment layers.</p></description>
+    </release>
+    <release version="0.13.0d" date="2026-08-05">
+      <description><p>Adds Selective Colour and hardens Colour Balance, Channel Mixer and Black &amp; White with shared advanced-colour infrastructure and presets.</p></description>
+    </release>
+    <release version="0.13.0c" date="2026-08-04">
+      <description><p>Adds Invert and managed Photo Filter adjustment layers while preserving and hardening Vibrance, Threshold and Posterise.</p></description>
+    </release>
+    <release version="0.13.0b.4" date="2026-08-04">
+      <description><p>Keeps Unsharp Mask and High Pass previews at full detail during slider interaction and reuses the completed level-0 frame on release.</p></description>
+    </release>
+    <release version="0.13.0b.3" date="2026-08-04">
+      <description><p>Keeps the last complete blur/sharpen interaction mip visible until its replacement or final level-0 render commits, eliminating slider flicker.</p></description>
+    </release>
+    <release version="0.13.0b.2" date="2026-08-04">
+      <description><p>Parallelises CPU blur and sharpen references and adds responsive mip-scaled slider previews with unchanged full-quality final rendering.</p></description>
+    </release>
+    <release version="0.13.0b.1" date="2026-08-04">
+      <description><p>Fixes the Qt 6 Fedora build by including the complete QColorSpace type in the spatial-filter implementation.</p></description>
+    </release>
+    <release version="0.13.0b" date="2026-08-04">
+      <description>
+        <p>Adds non-destructive Gaussian Blur, Box Blur, Unsharp Mask and High Pass adjustment layers on the radius-aware tiled spatial-filter foundation.</p>
+      </description>
+    </release>
+    <release version="0.13.0a" date="2026-08-04">
+      <description>
+        <p>Adds reusable tile-halo, edge, Alpha, cancellation, cache and CPU/WGSL spatial-filter contracts.</p>
+      </description>
+    </release>
+    <release version="0.11.0i.3" date="2026-08-03">
+      <description>
+        <p>Fixes retained tool-options widget actions at shutdown, hardens Smudge image writes and adds ASan/UBSan diagnostic builds.</p>
+      </description>
+    </release>
+    <release version="0.11.0i.2" date="2026-08-03">
+      <description>
+        <p>Removes event-scaled Smudge preview copies, uses continuous dab spacing and limits final history work to path-touched tiles.</p>
+      </description>
+    </release>
+    <release version="0.11.0i.1" date="2026-08-02">
+      <description>
+        <p>Improves long Smudge-stroke performance, imports isolated GPU validation results without rerunning the full suite in the GUI, and fixes canvas/GPU shutdown ordering.</p>
+      </description>
+    </release>
+    <release version="0.11.0i" date="2026-08-02">
+      <description>
+        <p>Completes the colour-management milestone with project/residency hardening, immutable ICC/OCIO resource audits, no silent substitution and final deterministic conformance coverage.</p>
+      </description>
+    </release>
+    <release version="0.11.0h" date="2026-08-02">
+      <description>
+        <p>Adds explicit ICC/OCIO working-to-output export, 8/16-bit format controls, Alpha-safe output handling and deterministic RGB blue-noise dithering.</p>
+      </description>
+    </release>
+    <release version="0.11.0g" date="2026-08-02">
+      <description>
+        <p>Adds parity-gated RGBA8/RGBA16 WGSL evaluation of CPU-reference display, OCIO View and soft-proof lattices, plus managed working-to-adjustment-domain compositor transforms with exact CPU fallback.</p>
+      </description>
+    </release>
+    <release version="0.11.0f" date="2026-08-02">
+      <description>
+        <p>Adds presentation-only monitor ICC and OCIO Display/View colour management, soft-proof controls, monitor discovery and schema-4 legacy appearance protection.</p>
+      </description>
+    </release>
+    <release version="0.11.0e.3" date="2026-08-02">
+      <description>
+        <p>Polishes the initial sizing of colour-management and OCIO/ACES dialogs while retaining the OpenColorIO static-package handoff and GCC 16 dependency compatibility fixes.</p>
+      </description>
+    </release>
+    <release version="0.11.0c" date="2026-08-02">
+      <description>
+        <p>Adds explicit working-space selection, Assign Profile and transactional Convert to Profile workflows with RGBA8/RGBA16, semantic-colour, Undo/Redo, cancellation and persistence coverage.</p>
+      </description>
+    </release>
+    <release version="0.11.0b" date="2026-08-02">
+      <description>
+        <p>Adds ICC-aware image ingress, consistent untagged-image policy, profile diagnostics and schema-2 colour-state persistence without converting pixels.</p>
+      </description>
+    </release>
+    <release version="0.11.0a.2" date="2026-08-02">
+      <description>
+        <p>Fixes asynchronous paint commits being rejected after mouse release because their render identity omitted the document colour-state revision.</p>
+      </description>
+    </release>
+    <release version="0.11.0a.1" date="2026-08-02">
+      <description>
+        <p>Removes Qt deprecation and GCC narrowing warnings from the 0.11.0a colour-state foundation without changing behaviour.</p>
+      </description>
+    </release>
+    <release version="0.11.0a" date="2026-08-02">
+      <description>
+        <p>Adds explicit document colour-state architecture, legacy-project appearance protection, version-15 persistence, version-16 residency and colour-aware cache identities.</p>
+      </description>
+    </release>
+    <release version="0.10.1g.1" date="2026-08-02">
+      <description>
+        <p>Fixes the GCC build ambiguity in the LUT Inspector domain-source formatter without changing LUT behaviour or persisted schemas.</p>
+      </description>
+    </release>
+    <release version="0.10.1g" date="2026-08-02">
+      <description>
+        <p>Adds complete LUT Inspector diagnostics, interpolation control, persistence/residency hardening and safer user preset storage.</p>
+      </description>
+    </release>
+    <release version="0.10.1f" date="2026-08-02">
+      <description>
+        <p>Adds direct RGBA16Float LUT upload, native trilinear/tetrahedral and transfer/operator evaluation, expanded startup parity and selective CPU fallback.</p>
+      </description>
+    </release>
+    <release version="0.10.1e" date="2026-08-02">
+      <description>
+        <p>Adds persisted Tony McMapface and AgX Base sRGB operator pipelines with reference preprocessing, tetrahedral CPU evaluation, import detection and safe migration.</p>
+      </description>
+    </release>
+    <release version="0.10.1d" date="2026-08-02">
+      <description>
+        <p>Adds explicit encoded, linear sRGB/Rec.709 and raw-component LUT processing contracts with transfer-aware CPU evaluation, persistence and selective GPU fallback.</p>
+      </description>
+    </release>
+    <release version="0.10.1c" date="2026-08-02">
+      <description>
+        <p>Adds the authoritative scalar LUT evaluator with deterministic trilinear/tetrahedral interpolation, explicit table staging and unclamped intermediate output.</p>
+      </description>
+    </release>
+    <release version="0.10.1b" date="2026-08-02">
+      <description>
+        <p>Adds strict Cube parser and LUT data-model conformance with duplicate/conflict validation, finite-value preservation, range-source persistence and actionable line-numbered diagnostics.</p>
+      </description>
+    </release>
+    <release version="0.10.1a" date="2026-08-02">
+      <description>
+        <p>Adds independent deterministic LUT conformance fixtures and known-defect baselines, plus New from Clipboard with image metadata preservation.</p>
+      </description>
+    </release>
+    <release version="0.10.0l" date="2026-08-01">
+      <description>
+        <p>Completes the vector workflow milestone with bounded project/vector decoding and end-to-end persistence, alpha, residency, merge and Fill/Gradient regression hardening.</p>
+      </description>
+    </release>
+    <release version="0.10.0k.1" date="2026-08-01">
+      <description>
+        <p>Preserves layer multi-selection on context click and restores independent editability for every path object in merged vector layers.</p>
+      </description>
+    </release>
+    <release version="0.10.0k" date="2026-08-01">
+      <description>
+        <p>Adds atomic raster-with-raster and vector-with-vector layer merging, including editable semantic-shape-to-path conversion for vector results.</p>
+      </description>
+    </release>
+    <release version="0.10.0j.1" date="2026-08-01">
+      <description>
+        <p>Makes Gradient placement responsive with a coalesced asynchronous screen-resolution preview while retaining the unchanged full-resolution commit path.</p>
+      </description>
+    </release>
+    <release version="0.10.0j" date="2026-08-01">
+      <description>
+        <p>Adds live selection-aware Linear, Radial, Angle, Reflected and Diamond raster gradients for layers, masks and editable channels with atomic Undo and parity-gated tiled GPU application.</p>
+      </description>
+    </release>
+    <release version="0.10.0i.1" date="2026-08-01">
+      <description>
+        <p>Fixes native Fill shader validation by replacing unsupported multi-component swizzle assignment and adding build/runtime WGSL guards.</p>
+      </description>
+    </release>
+    <release version="0.10.0i" date="2026-08-01">
+      <description>
+        <p>Adds a selection-aware raster Fill Tool for layers, masks and editable channels with tolerance, contiguous/global matching, transparency controls and parity-gated tiled GPU application.</p>
+      </description>
+    </release>
+    <release version="0.10.0h" date="2026-08-01">
+      <description>
+        <p>Adds reusable vector appearance presets with full fill, stroke, dash and arrowhead styling plus save, apply, rename and delete management.</p>
+      </description>
+    </release>
+    <release version="0.10.0g.2" date="2026-08-01">
+      <description>
+        <p>Restricts arrowhead shaft-cap clipping to the local endpoint footprint so winding Pen paths retain all unrelated stroke segments.</p>
+      </description>
+    </release>
+    <release version="0.10.0g.1" date="2026-08-01">
+      <description>
+        <p>Centres endpoint arrowheads so shaft caps cannot blunt pointed markers and hides inapplicable arrow controls for closed vector shapes.</p>
+      </description>
+    </release>
+    <release version="0.10.0g" date="2026-08-01">
+      <description><p>Adds independent stroke arrowheads, SVG markers, Expand Stroke integration and a semantic filled Arrow Shape.</p></description>
+    </release>
+    <release version="0.10.0f.3" date="2026-08-01">
+      <description><p>Preserves nonzero winding for expanded dashed strokes so overlapping dash islands expand reliably without connector spokes.</p></description>
+    </release>
+    <release version="0.10.0f.2" date="2026-08-01">
+      <description>
+        <p>Restores dashed Expand Stroke by filtering only zero-area seam debris while retaining independent editable dash contours and clean compound stroke rings.</p>
+      </description>
+    </release>
+    <release version="0.10.0f.1" date="2026-08-01">
+      <description>
+        <p>Hardens Expand Stroke with independent dashed contours and seam-free editable compound stroke rings.</p>
+      </description>
+    </release>
+    <release version="0.10.0f" date="2026-08-01">
+      <description>
+        <p>Adds editable Expand Stroke geometry for alignment, caps, joins, miter limits and dashed outlines while preserving layer compositing.</p>
+      </description>
+    </release>
+    <release version="0.10.0e" date="2026-08-01">
+      <description>
+        <p>Adds fixed-screen vector component hover feedback, distinct selection styling and overlap-aware hit targeting.</p>
+      </description>
+    </release>
+    <release version="0.10.0d" date="2026-08-01">
+      <description>
+        <p>Adds fill/stroke swap and reset actions, validated appearance copy/paste, and restores middle-mouse panning in vector path tools.</p>
+      </description>
+    </release>
+    <release version="0.10.0c" date="2026-08-01">
+      <description>
+        <p>Adds keyboard node selection, document-space nudging, safe deletion and Escape-first deselection for Direct Selection and Corner Tool.</p>
+      </description>
+    </release>
+    <release version="0.10.0b" date="2026-08-01">
+      <description>
+        <p>Adds endpoint-aware Pen continuation, open-path joining, close/continue/join feedback and segment-safe cancellation.</p>
+      </description>
+    </release>
+    <release version="0.10.0a" date="2026-08-01">
+      <description>
+        <p>Adds explicit appearance-preserving conversion from semantic vector shapes to editable Bézier paths.</p>
+      </description>
+    </release>
+    <release version="0.9.0g.4" date="2026-07-31">
+      <description>
+        <p>Adds Shape-style Fill, Stroke, colour, width and detailed solid/dashed stroke controls to the Pen Tool top options bar.</p>
+      </description>
+    </release>
+    <release version="0.9.0g.3" date="2026-07-31">
+      <description>
+        <p>Adds semantic dashed vector strokes, primary-stroke/secondary-fill creation defaults and a bundled Corner Tool placeholder icon.</p>
+      </description>
+    </release>
+    <release version="0.9.0g.2.2" date="2026-07-31">
+      <description>
+        <p>Adds a true Make Sharp Direct Selection operation that collapses both Bézier handles into the anchor while retaining Make Corner as the separate handle-decoupling command.</p>
+      </description>
+    </release>
+    <release version="0.9.0g.2.1" date="2026-07-31"/>
+    <release version="0.9.0g.1" date="2026-07-31"/>
+    <release version="0.9.0f" date="2026-07-31"/>
+    <release version="0.9.0e" date="2026-07-31"/>
+    <release version="0.9.0d.1.1" date="2026-07-30"/>
+    <release version="0.9.0d" date="2026-07-30"/>
+    <release version="0.9.0c.4" date="2026-07-30"/>
+    <release version="0.9.0c.3" date="2026-07-30"/>
+    <release version="0.9.0c.2" date="2026-07-30"/>
+    <release version="0.9.0c.1" date="2026-07-30"/>
+    <release version="0.9.0c" date="2026-07-30"/>
+    <release version="0.9.0b.2" date="2026-07-30"/>
+    <release version="0.9.0b.1" date="2026-07-30"/>
+    <release version="0.9.0b" date="2026-07-30"/>
+    <release version="0.9.0a.2" date="2026-07-30"/>
+    <release version="0.9.0a.1" date="2026-07-30"/>
+    <release version="0.9.0a" date="2026-07-29"/>
+    <release version="0.8.0f" date="2026-07-29"/>
+    <release version="0.8.0e" date="2026-07-29"/>
+    <release version="0.8.0d.1" date="2026-07-29"/>
+    <release version="0.8.0d" date="2026-07-29"/>
+    <release version="0.8.0c.6" date="2026-07-29"/>
+    <release version="0.8.0c.5" date="2026-07-29"/>
+    <release version="0.8.0c.4" date="2026-07-29"/>
+    <release version="0.8.0c.3" date="2026-07-29"/>
+    <release version="0.8.0c.2" date="2026-07-29"/>
+    <release version="0.8.0c.1" date="2026-07-29"/>
+    <release version="0.8.0c" date="2026-07-29"/>
+    <release version="0.8.0b.1" date="2026-07-29"/>
+    <release version="0.8.0a" date="2026-07-29"/>
+    <release version="0.7.0e.5.1" date="2026-07-29"/>
+    <release version="0.7.0e.4.1" date="2026-07-29"/>
+    <release version="0.7.0e.4" date="2026-07-29"/>
+    <release version="0.7.0e.3.7" date="2026-07-29"/>
+    <release version="0.7.0e.2" date="2026-07-28"/>
+    <release version="0.7.0e.1" date="2026-07-28"/>
+    <release version="0.7.0d.4" date="2026-07-28"/>
+    <release version="0.7.0d.3" date="2026-07-28"/>
+    <release version="0.7.0d.2" date="2026-07-28"/>
+    <release version="0.7.0d.1" date="2026-07-28"/>
+    <release version="0.7.0c.5" date="2026-07-28"/>
+    <release version="0.7.0c.4" date="2026-07-28"/>
+    <release version="0.7.0c.3" date="2026-07-28"/>
+    <release version="0.7.0c.2" date="2026-07-28"/>
+    <release version="0.7.0c.1.1" date="2026-07-28"/>
+    <release version="0.7.0c.1" date="2026-07-28"/>
+    <release version="0.7.0b.6.2" date="2026-07-28"/>
+    <release version="0.7.0b.6.1" date="2026-07-28"/>
+    <release version="0.7.0b.6" date="2026-07-28"/>
+    <release version="0.7.0b.5" date="2026-07-28"/>
+    <release version="0.7.0b.4" date="2026-07-27"/>
+    <release version="0.7.0b.3" date="2026-07-27"/>
+    <release version="0.7.0b.2" date="2026-07-27"/>
+    <release version="0.7.0b.1" date="2026-07-27"/>
+    <release version="0.7.0b" date="2026-07-27"/>
+    <release version="0.7.0a" date="2026-07-27"/>
+    <release version="0.6.0i.1" date="2026-07-27"/>
+    <release version="0.6.0i" date="2026-07-27"/>
+    <release version="0.6.0h" date="2026-07-27"/>
+    <release version="0.6.0g" date="2026-07-27"/>
+    <release version="0.6.0f.1" date="2026-07-27"/>
+    <release version="0.6.0f" date="2026-07-27"/>
+    <release version="0.6.0e" date="2026-07-27"/>
+    <release version="0.6.0d.1" date="2026-07-27"/>
+    <release version="0.6.0d" date="2026-07-27"/>
+    <release version="0.6.0c.1" date="2026-07-27"/>
+    <release version="0.6.0c" date="2026-07-27"/>
+    <release version="0.6.0b.1" date="2026-07-27"/>
+    <release version="0.6.0b" date="2026-07-27"/>
+    <release version="0.6.0a.2" date="2026-07-27"/>
+    <release version="0.6.0a.1" date="2026-07-27"/>
+    <release version="0.6.0a" date="2026-07-27"/>
+    <release version="0.5.0h.2" date="2026-07-27"/>
+    <release version="0.5.0h.1" date="2026-07-27"/>
+    <release version="0.5.0h" date="2026-07-27"/>
+    <release version="0.5.0f.1" date="2026-07-26"/>
+    <release version="0.5.0f" date="2026-07-26"/>
+    <release version="0.5.0g" date="2026-07-26"/>
+    <release version="0.5.0e" date="2026-07-26"/>
+    <release version="0.5.0d" date="2026-07-26"/>
+    <release version="0.5.0c" date="2026-07-26"/>
+    <release version="0.5.0b.1" date="2026-07-26"/>
+    <release version="0.5.0b" date="2026-07-26"/>
+    <release version="0.5.0a" date="2026-07-26"/>
+    <release version="0.4.3d.2" date="2026-07-26"/>
+    <release version="0.4.3d.1" date="2026-07-26"/>
+    <release version="0.4.3d" date="2026-07-26"/>
+    <release version="0.4.3c" date="2026-07-26"/>
+    <release version="0.4.3b.1" date="2026-07-26"/>
+    <release version="0.4.3b" date="2026-07-26"/>
+    <release version="0.4.2.1" date="2026-07-26"/>
+    <release version="0.4.2" date="2026-07-26"/>
+    <release version="0.4.1" date="2026-07-25"/>
+    <release version="0.4.0e.1" date="2026-07-25"/>
+    <release version="0.4.0d.3" date="2026-07-25"/>
+    <release version="0.4.0d.2.1" date="2026-07-25"/>
+    <release version="0.4.0d.2" date="2026-07-25"/>
+    <release version="0.4.0d.1" date="2026-07-25"/>
+    <release version="0.4.0c.2" date="2026-07-25"/>
+    <release version="0.4.0c.1" date="2026-07-25"/>
+    <release version="0.4.0b.2" date="2026-07-25"/>
+    <release version="0.4.0b.1" date="2026-07-25"/>
+    <release version="0.4.0a.2" date="2026-07-25"/>
+    <release version="0.4.0a.1" date="2026-07-25"/>
+    <release version="0.3.0e.1" date="2026-07-25"/>
+    <release version="0.3.0d.1" date="2026-07-25"/>
+    <release version="0.3.0d" date="2026-07-25"/>
+    <release version="0.3.0c.1" date="2026-07-25"/>
+    <release version="0.3.0c" date="2026-07-25"/>
+    <release version="0.3.0b.1" date="2026-07-25"/>
+    <release version="0.3.0b" date="2026-07-25"/>
+    <release version="0.3.0a.1" date="2026-07-24"/>
+    <release version="0.3.0a" date="2026-07-24"/>
+    <release version="0.2.3" date="2026-07-24"/>
+    <release version="0.2.2" date="2026-07-24"/>
+    <release version="0.2.1" date="2026-07-24"/>
+    <release version="0.2.0" date="2026-07-24"/>
+    <release version="0.1.11" date="2026-07-24"/>
+    <release version="0.1.10" date="2026-07-24"/>
+    <release version="0.1.9" date="2026-07-24"/>
+    <release version="0.1.8" date="2026-07-24"/>
+    <release version="0.1.7" date="2026-07-24"/>
+    <release version="0.1.6" date="2026-07-24"/>
+    <release version="0.1.5" date="2026-07-24"/>
+    <release version="0.1.4" date="2026-07-24"/>
+    <release version="0.1.3" date="2026-07-24"/>
+    <release version="0.1.2" date="2026-07-24"/>
+    <release version="0.1.1" date="2026-07-24"/>
+  </releases>
+</component>

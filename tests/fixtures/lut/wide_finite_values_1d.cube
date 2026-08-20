@@ -1,0 +1,4 @@
+TITLE "Wide Finite Values"
+LUT_1D_SIZE 2
+-32 -24 -20
+32 24 20

@@ -1,0 +1,13 @@
+TITLE "Combined Half Shaper and Red Blue Swap"
+LUT_1D_SIZE 2
+LUT_3D_SIZE 2
+0 0 0
+0.5 0.5 0.5
+0 0 0
+0 0 1
+0 1 0
+0 1 1
+1 0 0
+1 0 1
+1 1 0
+1 1 1
