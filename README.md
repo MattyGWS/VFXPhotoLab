@@ -34,6 +34,18 @@ This is the final implementation stage of **0.14.0 — Smart Layers, Live Filter
 
 Architecture/hardening notes: `docs/FULL_WORKFLOW_HARDENING_0.14.0m.md`. Fedora regression plan: `docs/TEST_PLAN.md`.
 
+## Windows builds and releases
+
+Windows x64 binaries are built on GitHub rather than on the Fedora development machine. Each public GitHub Release can contain a normal per-user Setup installer, a portable ZIP and matching SHA-256 checksums. The Windows build includes the native Qt application, pinned wgpu-native backend and OpenColorIO support; users do not need a compiler or Qt installation.
+
+Maintainer publication follows the same one-command workflow as VFX Texture Lab:
+
+```bash
+./tools/publish_windows_release.sh --yes
+```
+
+That command commits/pushes the current release, starts the clean Windows GitHub Actions build, waits for tests and installer smoke checks, derives patch notes from `CHANGELOG.md`, verifies the release assets and publishes the result. See [`docs/WINDOWS_RELEASES.md`](docs/WINDOWS_RELEASES.md) for the complete workflow and first-time GitHub CLI setup.
+
 ## 0.14.0k.2 Bevel & Emboss Fedora Build Fix 2
 
 This is a build-only follow-up to 0.14.0k. It includes the 0.14.0k.1 persistence/cache-key compile fixes and additionally fixes Qt 6 `qsizetype`/`int` mismatches in the Layer Effect and Live Filter reorder paths. Rendering and persisted schemas are unchanged.

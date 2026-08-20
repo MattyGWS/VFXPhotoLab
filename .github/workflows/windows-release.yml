@@ -1,0 +1,291 @@
+name: Build Windows app
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What should happen after a successful build?
+        required: true
+        type: choice
+        default: test-build
+        options:
+          - test-build
+          - draft-release
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      PYTHONUTF8: "1"
+      RELEASE_MODE: ${{ github.event_name == 'push' && 'draft-release' || inputs.mode }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: x64
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          arch: win64_msvc2022_64
+          modules: 'qtimageformats'
+          cache: true
+
+      - name: Cache OpenColorIO build
+        uses: actions/cache@v4
+        with:
+          path: |
+            third_party/opencolorio
+            build/deps/opencolorio-2.5.2/ext/dist
+          key: windows-ocio-2.5.2-${{ hashFiles('scripts/fetch-opencolorio.ps1') }}
+
+      - name: Validate checked-in assets
+        shell: pwsh
+        run: |
+          python scripts/check-wgsl-reserved.py
+          python scripts/check-tool-icons.py
+
+      - name: Fetch pinned wgpu-native
+        shell: pwsh
+        run: ./scripts/fetch-wgpu-native.ps1
+
+      - name: Fetch/build pinned OpenColorIO
+        shell: pwsh
+        run: ./scripts/fetch-opencolorio.ps1
+
+      - name: Prepare release metadata
+        id: metadata
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build, dist, release | Out-Null
+          python tools/windows_release.py prepare `
+            --release-notes build/release-notes.md `
+            --metadata-json build/release-metadata.json `
+            --github-output $env:GITHUB_OUTPUT
+
+      - name: Validate tag and version
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $expected = "${{ steps.metadata.outputs.tag }}"
+          if ($env:GITHUB_REF_NAME -ne $expected) {
+            throw "Tag $env:GITHUB_REF_NAME does not match VFX Photo Lab version $expected."
+          }
+
+      - name: Configure release build
+        shell: pwsh
+        run: |
+          $ocioRoot = (Resolve-Path "third_party/opencolorio").Path
+          $ocioDeps = (Resolve-Path "build/deps/opencolorio-2.5.2/ext/dist").Path
+          $ocioConfig = Join-Path $ocioRoot "lib/cmake/OpenColorIO"
+          cmake -S . -B build/windows-release -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTING=ON `
+            -DVFXPHOTOLAB_ENABLE_WEBGPU=ON `
+            -DVFXPHOTOLAB_ENABLE_OCIO=ON `
+            "-DVFXPHOTOLAB_OCIO_ROOT=$ocioRoot" `
+            "-DVFXPHOTOLAB_OCIO_DEPENDENCY_ROOT=$ocioDeps" `
+            "-DOpenColorIO_DIR=$ocioConfig"
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build/windows-release --parallel
+
+      - name: Run core tests
+        shell: pwsh
+        run: ctest --test-dir build/windows-release --output-on-failure -C Release
+
+      - name: Install portable tree and deploy Qt
+        shell: pwsh
+        run: |
+          $prefix = Join-Path (Resolve-Path .).Path "dist/VFX Photo Lab"
+          cmake --install build/windows-release --prefix $prefix --config Release
+
+      - name: Verify portable application
+        shell: pwsh
+        run: |
+          python tools/windows_release.py verify `
+            --dist "dist/VFX Photo Lab" `
+            --smoke-json build/portable-smoke.json
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $candidates = @(
+            Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue
+            Get-ChildItem "${env:ProgramFiles}\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue
+          ) | Sort-Object FullName -Descending
+          $iscc = $candidates | Select-Object -First 1
+          if ($null -eq $iscc) {
+            throw "Inno Setup compiler was not found after installation."
+          }
+          "ISCC_PATH=$($iscc.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build installer
+        shell: pwsh
+        env:
+          VFXPL_VERSION: ${{ steps.metadata.outputs.version }}
+          VFXPL_WINDOWS_VERSION: ${{ steps.metadata.outputs.windows_version }}
+          VFXPL_SOURCE_DIR: ${{ github.workspace }}\dist\VFX Photo Lab
+          VFXPL_OUTPUT_DIR: ${{ github.workspace }}\build\inno
+          VFXPL_INSTALLER_BASENAME: ${{ steps.metadata.outputs.asset_stem }}-Setup
+        run: |
+          New-Item -ItemType Directory -Force $env:VFXPL_OUTPUT_DIR | Out-Null
+          & $env:ISCC_PATH "packaging/windows/VFXPhotoLab.iss"
+
+      - name: Test installed application
+        shell: pwsh
+        run: |
+          function Invoke-CheckedProcess {
+            param(
+              [Parameter(Mandatory = $true)][string] $FilePath,
+              [string[]] $ArgumentList = @(),
+              [Parameter(Mandatory = $true)][string] $Description
+            )
+
+            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $FilePath
+            $startInfo.UseShellExecute = $false
+            foreach ($argument in $ArgumentList) {
+              [void] $startInfo.ArgumentList.Add($argument)
+            }
+
+            $process = [System.Diagnostics.Process]::Start($startInfo)
+            if ($null -eq $process) {
+              throw "Failed to start $Description."
+            }
+            $process.WaitForExit()
+            if ($process.ExitCode -ne 0) {
+              throw "$Description failed with exit code $($process.ExitCode)."
+            }
+          }
+
+          $installer = (Resolve-Path "build/inno/${{ steps.metadata.outputs.installer_filename }}").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "VFX Photo Lab Installer Test"
+          Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+
+          Invoke-CheckedProcess `
+            -FilePath $installer `
+            -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") `
+            -Description 'Installer smoke test'
+
+          $installedExe = Join-Path $installDir "VFXPhotoLab.exe"
+          if (-not (Test-Path $installedExe)) {
+            throw "Installer did not create $installedExe"
+          }
+          $smokeReport = Join-Path (Resolve-Path build).Path "installed-smoke.json"
+          Invoke-CheckedProcess `
+            -FilePath $installedExe `
+            -ArgumentList @('--package-smoke-test', '--require-full-release', '--json', $smokeReport) `
+            -Description 'Installed application smoke test'
+
+          if (-not (Test-Path $smokeReport)) {
+            throw "Installed application did not create its smoke-test report."
+          }
+
+          $uninstaller = Join-Path $installDir "unins000.exe"
+          if (-not (Test-Path $uninstaller)) {
+            throw "Installer did not create its uninstaller."
+          }
+          Invoke-CheckedProcess `
+            -FilePath $uninstaller `
+            -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') `
+            -Description 'Uninstaller smoke test'
+
+      - name: Create portable ZIP and checksums
+        shell: pwsh
+        run: |
+          python tools/windows_release.py package `
+            --dist "dist/VFX Photo Lab" `
+            --installer "build/inno/${{ steps.metadata.outputs.installer_filename }}" `
+            --release-dir release
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.metadata.outputs.artifact_name }}
+          path: |
+            release/${{ steps.metadata.outputs.portable_filename }}
+            release/${{ steps.metadata.outputs.installer_filename }}
+            release/${{ steps.metadata.outputs.checksum_filename }}
+            build/portable-smoke.json
+            build/installed-smoke.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-build-diagnostics-${{ github.run_number }}
+          path: |
+            build/release-metadata.json
+            build/release-notes.md
+            build/portable-smoke.json
+            build/installed-smoke.json
+            build/windows-release/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Create or update draft GitHub Release
+        if: env.RELEASE_MODE == 'draft-release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+          PORTABLE: release/${{ steps.metadata.outputs.portable_filename }}
+          INSTALLER: release/${{ steps.metadata.outputs.installer_filename }}
+          CHECKSUMS: release/${{ steps.metadata.outputs.checksum_filename }}
+        run: |
+          git fetch --tags --force
+          $tagText = (git tag --list $env:RELEASE_TAG | Out-String).Trim()
+          $tagExists = -not [string]::IsNullOrWhiteSpace($tagText)
+          if ($tagExists) {
+            $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
+            if ($tagCommit -ne $env:GITHUB_SHA) {
+              throw "Existing tag $env:RELEASE_TAG points to $tagCommit, not this build's $env:GITHUB_SHA."
+            }
+          }
+
+          gh release view $env:RELEASE_TAG 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG $env:PORTABLE $env:INSTALLER $env:CHECKSUMS --clobber
+            gh release edit $env:RELEASE_TAG `
+              --draft `
+              --title "VFX Photo Lab $env:RELEASE_VERSION" `
+              --notes-file build/release-notes.md
+          } else {
+            gh release create $env:RELEASE_TAG `
+              $env:PORTABLE $env:INSTALLER $env:CHECKSUMS `
+              --draft `
+              --target $env:GITHUB_SHA `
+              --title "VFX Photo Lab $env:RELEASE_VERSION" `
+              --notes-file build/release-notes.md
+          }

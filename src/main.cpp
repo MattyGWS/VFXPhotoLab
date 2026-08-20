@@ -1,11 +1,14 @@
 #include "AppStyle.h"
 #include "MainWindow.h"
+#include "OcioIntegration.h"
 #include "gpu/RenderBackend.h"
 
 #include <QApplication>
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
 #include <QJsonDocument>
@@ -29,6 +32,8 @@
 namespace {
 
 constexpr auto kGpuSelfTestArgument = "--gpu-self-test";
+constexpr auto kPackageSmokeTestArgument = "--package-smoke-test";
+constexpr auto kPackageSmokeRequireFullArgument = "--require-full-release";
 constexpr int kGpuHelperTimeoutMs = 20000;
 constexpr auto kGpuCapabilitiesMarker = "VFXPHOTOLAB_GPU_CAPABILITIES=";
 
@@ -136,6 +141,119 @@ bool hasArgument(const int argc, char *argv[], const char *argument)
         }
     }
     return false;
+}
+
+QString argumentValue(const int argc,
+                      char *argv[],
+                      const char *argument)
+{
+    for (int index = 1; index + 1 < argc; ++index) {
+        if (std::strcmp(argv[index], argument) == 0) {
+            return QString::fromLocal8Bit(argv[index + 1]);
+        }
+    }
+    return {};
+}
+
+int runPackageSmokeTest(int argc, char *argv[])
+{
+    QCoreApplication application(argc, argv);
+    QCoreApplication::setApplicationName(QStringLiteral("VFX Photo Lab Package Smoke Test"));
+    QCoreApplication::setApplicationVersion(QString::fromLatin1(VFXPHOTOLAB_VERSION));
+
+    const bool requireFullRelease =
+        hasArgument(argc, argv, kPackageSmokeRequireFullArgument);
+    const QString applicationDirectory = QCoreApplication::applicationDirPath();
+    const QDir applicationDir(applicationDirectory);
+    const auto existsAny = [&applicationDir](const QStringList &relativePaths) {
+        return std::any_of(relativePaths.cbegin(),
+                           relativePaths.cend(),
+                           [&applicationDir](const QString &path) {
+            return QFileInfo::exists(applicationDir.filePath(path));
+        });
+    };
+
+    QStringList imageFormats;
+    for (const QByteArray &format : QImageReader::supportedImageFormats()) {
+        imageFormats.push_back(QString::fromLatin1(format).toLower());
+    }
+    imageFormats.removeDuplicates();
+    imageFormats.sort();
+    const bool jpegAvailable = imageFormats.contains(QStringLiteral("jpeg"))
+        || imageFormats.contains(QStringLiteral("jpg"));
+
+#ifdef Q_OS_WIN
+    const bool windowsPlatformPlugin = existsAny({
+        QStringLiteral("platforms/qwindows.dll"),
+        QStringLiteral("plugins/platforms/qwindows.dll")
+    });
+    const bool jpegPluginFile = existsAny({
+        QStringLiteral("imageformats/qjpeg.dll"),
+        QStringLiteral("plugins/imageformats/qjpeg.dll")
+    });
+    const bool wgpuRuntime = existsAny({
+        QStringLiteral("wgpu_native.dll"),
+        QStringLiteral("wgpu.dll")
+    });
+#else
+    const bool windowsPlatformPlugin = true;
+    const bool jpegPluginFile = true;
+    const bool wgpuRuntime = true;
+#endif
+
+#ifdef VFXPHOTOLAB_PACKAGE_HAS_WEBGPU
+    constexpr bool webGpuCompiled = true;
+#else
+    constexpr bool webGpuCompiled = false;
+#endif
+
+    const bool ocioCompiled = vfx::ocioSupportCompiled();
+    const QString ocioVersion = vfx::ocioLibraryVersion();
+    const bool baseOk = !QCoreApplication::applicationVersion().isEmpty()
+        && jpegAvailable
+        && windowsPlatformPlugin
+        && jpegPluginFile;
+    const bool fullReleaseOk = !requireFullRelease
+        || (webGpuCompiled && wgpuRuntime && ocioCompiled);
+    const bool ok = baseOk && fullReleaseOk;
+
+    QJsonObject root;
+    root.insert(QStringLiteral("ok"), ok);
+    root.insert(QStringLiteral("version"), QCoreApplication::applicationVersion());
+    root.insert(QStringLiteral("applicationDirectory"), applicationDirectory);
+    root.insert(QStringLiteral("requireFullRelease"), requireFullRelease);
+    root.insert(QStringLiteral("jpegAvailable"), jpegAvailable);
+    root.insert(QStringLiteral("windowsPlatformPlugin"), windowsPlatformPlugin);
+    root.insert(QStringLiteral("jpegPluginFile"), jpegPluginFile);
+    root.insert(QStringLiteral("webGpuCompiled"), webGpuCompiled);
+    root.insert(QStringLiteral("wgpuRuntime"), wgpuRuntime);
+    root.insert(QStringLiteral("ocioCompiled"), ocioCompiled);
+    root.insert(QStringLiteral("ocioVersion"), ocioVersion);
+    root.insert(QStringLiteral("imageFormats"), imageFormats.join(QLatin1Char(',')));
+
+    const QByteArray report = QJsonDocument(root).toJson(QJsonDocument::Indented);
+    const QString jsonPath = argumentValue(argc, argv, "--json");
+    if (!jsonPath.isEmpty()) {
+        QFile file(jsonPath);
+        const QFileInfo fileInfo(file);
+        if (!fileInfo.absoluteDir().exists()
+            && !QDir().mkpath(fileInfo.absolutePath())) {
+            qCritical().noquote() << "Could not create smoke-test report directory:"
+                                  << fileInfo.absolutePath();
+            return 4;
+        }
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)
+            || file.write(report) != report.size()) {
+            qCritical().noquote() << "Could not write smoke-test report:"
+                                  << jsonPath;
+            return 4;
+        }
+    }
+
+    QTextStream output(stdout);
+    output << report;
+    output.flush();
+    return ok ? 0 : 3;
 }
 
 int runGpuSelfTest(int argc, char *argv[])
@@ -312,6 +430,9 @@ int main(int argc, char *argv[])
     // Never allow a native graphics-driver probe to sit in front of the GUI
     // startup boundary. The normal process launches this mode as a disposable
     // helper and kills it if a driver call stalls.
+    if (hasArgument(argc, argv, kPackageSmokeTestArgument)) {
+        return runPackageSmokeTest(argc, argv);
+    }
     if (hasArgument(argc, argv, kGpuSelfTestArgument)) {
         return runGpuSelfTest(argc, argv);
     }

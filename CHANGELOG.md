@@ -1,18 +1,19 @@
-# 0.14.0m.2 — Layer Effect Owner-Selection UX Fix
+# Changelog
+
+## 0.14.0m.2 — Layer Effect Owner-Selection UX Fix
 
 - Split presentation-row focus from owning-layer tool selection: Layer Effect and Live Filter rows resolve to hierarchy-safe owning roots for canvas/layer commands while remaining independently addressable sub-items in the Layers panel.
 - Move/Transform, transform overlays/prewarm/snapping, selected-pixel transforms, vector/path commands, mask operations, duplication/grouping/merging, Smart Layer source commands, Fit Canvas to Selected Layers and Export Selected SVG now operate on the owning layer when an fx/filter row is focused.
 - Preserved Layer Effect/Live Filter focus across whole-layer, selected-pixel and text-box transform commits so the Inspector stays on the edited effect/filter while its owner is moved or transformed.
 - Kept Delete and Move Up/Down semantics scoped to the selected effect/filter row rather than its owner.
+- Added the VFX Texture Lab-style automated Windows x64 release pipeline: one maintainer command can commit/push `main`, run the clean MSVC/Qt/wgpu-native/OpenColorIO build and tests on GitHub Actions, package portable and Inno Setup distributions, derive GitHub Release notes from this changelog, verify checksums/smoke reports, and publish the release.
 - No persistence/schema changes.
 
-# 0.14.0m.1 — Layer Effect Immediate Refresh Fix
+## 0.14.0m.1 — Layer Effect Immediate Refresh Fix
 
 - Fixed newly added renderable Layer Effects not appearing on the canvas until a later property edit or unrelated refresh.
 - Added matching immediate preview and document-thumbnail scheduling after Layer Effect add, remove and reorder operations.
 - Kept the fix at the structural fx invalidation boundary; no persistence/schema changes.
-
-# Changelog
 
 ## 0.14.0m — Full Workflow Integration and Hardening — 2026-08-14
 

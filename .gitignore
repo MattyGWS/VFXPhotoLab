@@ -32,3 +32,9 @@ Thumbs.db
 # Optional local wgpu-native SDK (keep only its placement notes)
 /third_party/wgpu-native/*
 !/third_party/wgpu-native/README.md
+
+# Local/retrieved Windows release output
+/release/
+/VFXPhotoLab-*-Windows-x64/
+/Windows-build-diagnostics-*/
+/windows-build-failure.*

@@ -1,7 +1,20 @@
 cmake_minimum_required(VERSION 3.24)
 
+# Public release/version string. This is the single authoritative version used
+# by About, CMake's numeric project metadata, Windows file metadata and the
+# automated GitHub release tooling.
+set(VFXPHOTOLAB_RELEASE_VERSION "0.14.0m.2")
+string(REGEX MATCH "^([0-9]+)[.]([0-9]+)[.]([0-9]+)"
+       VFXPHOTOLAB_NUMERIC_VERSION_MATCH "${VFXPHOTOLAB_RELEASE_VERSION}")
+if(NOT VFXPHOTOLAB_NUMERIC_VERSION_MATCH)
+    message(FATAL_ERROR
+        "VFXPHOTOLAB_RELEASE_VERSION must begin with a numeric major.minor.patch version")
+endif()
+set(VFXPHOTOLAB_CMAKE_VERSION
+    "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+
 project(VFXPhotoLab
-    VERSION 0.14.0
+    VERSION "${VFXPHOTOLAB_CMAKE_VERSION}"
     DESCRIPTION "A fast, non-destructive photo editor for Linux and Windows"
     LANGUAGES CXX
 )
@@ -39,6 +52,31 @@ set(CMAKE_AUTOUIC ON)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/adjustment_tile.wgsl"
      VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
+if(WIN32)
+    string(REGEX MATCHALL "[0-9]+" VFXPHOTOLAB_WINDOWS_VERSION_PARTS
+           "${VFXPHOTOLAB_RELEASE_VERSION}")
+    list(LENGTH VFXPHOTOLAB_WINDOWS_VERSION_PARTS _vfx_version_part_count)
+    while(_vfx_version_part_count LESS 4)
+        list(APPEND VFXPHOTOLAB_WINDOWS_VERSION_PARTS 0)
+        list(LENGTH VFXPHOTOLAB_WINDOWS_VERSION_PARTS _vfx_version_part_count)
+    endwhile()
+    list(GET VFXPHOTOLAB_WINDOWS_VERSION_PARTS 0 _vfx_version_0)
+    list(GET VFXPHOTOLAB_WINDOWS_VERSION_PARTS 1 _vfx_version_1)
+    list(GET VFXPHOTOLAB_WINDOWS_VERSION_PARTS 2 _vfx_version_2)
+    list(GET VFXPHOTOLAB_WINDOWS_VERSION_PARTS 3 _vfx_version_3)
+    set(VFXPHOTOLAB_WINDOWS_FILE_VERSION
+        "${_vfx_version_0},${_vfx_version_1},${_vfx_version_2},${_vfx_version_3}")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/VFXPhotoLab.ico"
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/VFXPhotoLab.ico"
+        COPYONLY)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/VFXPhotoLab.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/VFXPhotoLab.rc"
+        @ONLY)
+endif()
+
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/AdjustmentShaderSource.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/generated/AdjustmentShaderSource.h"
@@ -272,7 +310,7 @@ endif()
 target_include_directories(vfxphotolab_core
     PUBLIC src
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
-target_compile_definitions(vfxphotolab_core PUBLIC VFXPHOTOLAB_VERSION="0.14.0m.2")
+target_compile_definitions(vfxphotolab_core PUBLIC VFXPHOTOLAB_VERSION="${VFXPHOTOLAB_RELEASE_VERSION}")
 
 if(VFXPHOTOLAB_ENABLE_OCIO)
     if(TARGET OpenColorIO::OpenColorIO)
@@ -351,6 +389,10 @@ qt_add_executable(VFXPhotoLab
     src/NewDocumentDialog.h
     resources/resources.qrc
 )
+if(WIN32)
+    target_sources(VFXPhotoLab PRIVATE
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/VFXPhotoLab.rc")
+endif()
 
 target_link_libraries(VFXPhotoLab
     PRIVATE
@@ -366,10 +408,11 @@ if(VFXPHOTOLAB_ENABLE_WEBGPU AND VFXPHOTOLAB_WGPU_INCLUDE_DIR AND VFXPHOTOLAB_WG
             HINTS "${VFXPHOTOLAB_WGPU_ROOT}/bin" "${VFXPHOTOLAB_WGPU_ROOT}/lib"
                   "$ENV{WGPU_ROOT}/bin" "$ENV{WGPU_ROOT}/lib")
         if(VFXPHOTOLAB_WGPU_RUNTIME)
+            target_compile_definitions(VFXPhotoLab PRIVATE VFXPHOTOLAB_PACKAGE_HAS_WEBGPU=1)
             add_custom_command(TARGET VFXPhotoLab POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "${VFXPHOTOLAB_WGPU_RUNTIME}" "$<TARGET_FILE_DIR:VFXPhotoLab>")
-            install(FILES "${VFXPHOTOLAB_WGPU_RUNTIME}" DESTINATION bin)
+            install(FILES "${VFXPHOTOLAB_WGPU_RUNTIME}" DESTINATION .)
         endif()
     elseif(UNIX AND NOT APPLE)
         set_target_properties(VFXPhotoLab PROPERTIES BUILD_RPATH "${VFXPHOTOLAB_WGPU_LIBRARY_DIR}")
@@ -391,12 +434,23 @@ else()
     target_compile_options(VFXPhotoLab PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-install(TARGETS VFXPhotoLab
-    BUNDLE DESTINATION .
-    RUNTIME DESTINATION bin
-)
-install(DIRECTORY shaders/ DESTINATION share/vfxphotolab/shaders
-        FILES_MATCHING PATTERN "*.wgsl")
+if(WIN32)
+    # Keep the Windows portable/install tree flat around the executable so the
+    # same staged directory can be zipped directly or consumed by Inno Setup.
+    install(TARGETS VFXPhotoLab
+        RUNTIME DESTINATION .
+    )
+    install(DIRECTORY shaders/ DESTINATION shaders
+            FILES_MATCHING PATTERN "*.wgsl")
+    install(FILES LICENSE README.md CHANGELOG.md DESTINATION .)
+else()
+    install(TARGETS VFXPhotoLab
+        BUNDLE DESTINATION .
+        RUNTIME DESTINATION bin
+    )
+    install(DIRECTORY shaders/ DESTINATION share/vfxphotolab/shaders
+            FILES_MATCHING PATTERN "*.wgsl")
+endif()
 
 if(COMMAND qt_generate_deploy_app_script)
     qt_generate_deploy_app_script(
