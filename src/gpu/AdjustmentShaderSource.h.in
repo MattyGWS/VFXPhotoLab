@@ -1,7 +1,26 @@
 #pragma once
 
+#include <string>
+#include <string_view>
+
 namespace vfx::gpu_shader {
 
-inline constexpr char AdjustmentTile[] = R"VFXWGSL(@VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE@)VFXWGSL";
+// Keep every literal below MSVC's C2026 threshold. CMake generates these
+// chunks directly from shaders/adjustment_tile.wgsl without modifying it.
+inline constexpr std::string_view AdjustmentTileChunks[] = {
+@VFXPHOTOLAB_ADJUSTMENT_SHADER_CHUNKS@};
+
+inline const std::string &adjustmentTileSource()
+{
+    static const std::string source = [] {
+        std::string result;
+        result.reserve(@VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE_LENGTH@);
+        for (const std::string_view chunk : AdjustmentTileChunks) {
+            result.append(chunk.data(), chunk.size());
+        }
+        return result;
+    }();
+    return source;
+}
 
 } // namespace vfx::gpu_shader

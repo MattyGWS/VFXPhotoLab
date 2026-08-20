@@ -48,9 +48,37 @@ set(CMAKE_AUTOUIC ON)
 
 # Keep the checked-in WGSL file as the single authoritative adjustment shader.
 # CMake embeds that exact source into the core library at configure time so the
-# runtime and the standalone WGSL validator cannot drift apart.
+# runtime and the standalone WGSL validator cannot drift apart.  MSVC rejects
+# individual string literals larger than roughly 16 KiB (C2026), while the
+# adjustment shader is intentionally much larger.  Split it into conservative
+# 8 KiB raw-string chunks and concatenate them once at runtime.  The split is
+# byte-for-byte only; it does not alter or duplicate the authoritative WGSL.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/adjustment_tile.wgsl"
      VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE)
+set(VFXPHOTOLAB_ADJUSTMENT_SHADER_CHUNK_SIZE 8192)
+string(LENGTH "${VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE}"
+       VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE_LENGTH)
+set(_vfx_adjustment_shader_offset 0)
+set(VFXPHOTOLAB_ADJUSTMENT_SHADER_CHUNKS "")
+while(_vfx_adjustment_shader_offset LESS VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE_LENGTH)
+    math(EXPR _vfx_adjustment_shader_remaining
+         "${VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE_LENGTH} - ${_vfx_adjustment_shader_offset}")
+    if(_vfx_adjustment_shader_remaining GREATER VFXPHOTOLAB_ADJUSTMENT_SHADER_CHUNK_SIZE)
+        set(_vfx_adjustment_shader_chunk_length
+            ${VFXPHOTOLAB_ADJUSTMENT_SHADER_CHUNK_SIZE})
+    else()
+        set(_vfx_adjustment_shader_chunk_length
+            ${_vfx_adjustment_shader_remaining})
+    endif()
+    string(SUBSTRING "${VFXPHOTOLAB_ADJUSTMENT_SHADER_SOURCE}"
+           ${_vfx_adjustment_shader_offset}
+           ${_vfx_adjustment_shader_chunk_length}
+           _vfx_adjustment_shader_chunk)
+    string(APPEND VFXPHOTOLAB_ADJUSTMENT_SHADER_CHUNKS
+           "    R\"VFXWGSL(${_vfx_adjustment_shader_chunk})VFXWGSL\",\n")
+    math(EXPR _vfx_adjustment_shader_offset
+         "${_vfx_adjustment_shader_offset} + ${_vfx_adjustment_shader_chunk_length}")
+endwhile()
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 if(WIN32)

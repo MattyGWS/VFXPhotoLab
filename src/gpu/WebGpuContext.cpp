@@ -4664,7 +4664,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 )WGSL";
 
-    const char *adjustmentShaderSource = gpu_shader::AdjustmentTile;
+    const std::string &adjustmentShader = gpu_shader::adjustmentTileSource();
+    const char *adjustmentShaderSource = adjustmentShader.c_str();
 
     static constexpr char passThroughShaderSource[] = R"WGSL(
 struct PassThroughParams { opacity: f32, use_mask: u32, _padding0: u32, _padding1: u32, };

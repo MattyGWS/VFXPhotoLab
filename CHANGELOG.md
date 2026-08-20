@@ -7,6 +7,7 @@
 - Preserved Layer Effect/Live Filter focus across whole-layer, selected-pixel and text-box transform commits so the Inspector stays on the edited effect/filter while its owner is moved or transformed.
 - Kept Delete and Move Up/Down semantics scoped to the selected effect/filter row rather than its owner.
 - Added the VFX Texture Lab-style automated Windows x64 release pipeline: one maintainer command can commit/push `main`, run the clean MSVC/Qt/wgpu-native/OpenColorIO build and tests on GitHub Actions, package portable and Inno Setup distributions, derive GitHub Release notes from this changelog, verify checksums/smoke reports, and publish the release.
+- Fixed the first MSVC release-build blocker (`C2026: string too big`) by embedding the 44.8 KiB authoritative adjustment WGSL as conservative 8 KiB literals and reconstructing it once at runtime, preserving the shader byte-for-byte while staying below MSVC's per-literal limit.
 - No persistence/schema changes.
 
 ## 0.14.0m.1 — Layer Effect Immediate Refresh Fix
