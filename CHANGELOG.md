@@ -8,6 +8,7 @@
 - Kept Delete and Move Up/Down semantics scoped to the selected effect/filter row rather than its owner.
 - Added the VFX Texture Lab-style automated Windows x64 release pipeline: one maintainer command can commit/push `main`, run the clean MSVC/Qt/wgpu-native/OpenColorIO build and tests on GitHub Actions, package portable and Inno Setup distributions, derive GitHub Release notes from this changelog, verify checksums/smoke reports, and publish the release.
 - Fixed the first MSVC release-build blocker (`C2026: string too big`) by embedding the 44.8 KiB authoritative adjustment WGSL as conservative 8 KiB literals and reconstructing it once at runtime, preserving the shader byte-for-byte while staying below MSVC's per-literal limit.
+- Fixed the second Windows release-build blocker in `VFXPhotoLabTests`: refreshed stale selection-edit signatures and clipboard/guide/layer field names, replaced non-existent Qt helpers (`QPainter::fillEllipse`, `QTransform::fromRotate`), and made 16-bit `QImage::fill` calls unambiguous under MSVC without changing the tested rendering semantics.
 - No persistence/schema changes.
 
 ## 0.14.0m.1 — Layer Effect Immediate Refresh Fix

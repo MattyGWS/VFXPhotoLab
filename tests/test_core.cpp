@@ -884,7 +884,6 @@ void CoreTests::selectionClippedRasterErasePreservesHiddenRgb()
                                        source,
                                        QRect(QPoint(0, 0), size),
                                        selection.snapshot(),
-                                       size,
                                        QTransform(),
                                        SelectionEditKind::RasterPixels));
     QCOMPARE(erased.pixelColor(0, 0), source.pixelColor(0, 0));
@@ -947,7 +946,6 @@ void CoreTests::selectionClippedChannelsPreserveOtherComponents()
                                        source,
                                        edited.rect(),
                                        selection.snapshot(),
-                                       size,
                                        QTransform(),
                                        SelectionEditKind::ComponentChannel,
                                        0));
@@ -960,7 +958,6 @@ void CoreTests::selectionClippedChannelsPreserveOtherComponents()
                                        source,
                                        edited.rect(),
                                        selection.snapshot(),
-                                       size,
                                        QTransform(),
                                        SelectionEditKind::GreyChannel));
     QCOMPARE(edited.pixelColor(0, 0), source.pixelColor(0, 0));
@@ -975,7 +972,6 @@ void CoreTests::selectionClippedChannelsPreserveOtherComponents()
                                        mask,
                                        paintedMask.rect(),
                                        selection.snapshot(),
-                                       size,
                                        QTransform(),
                                        SelectionEditKind::Mask));
     QCOMPARE(paintedMask.constScanLine(0)[0], static_cast<uchar>(255));
@@ -994,7 +990,6 @@ void CoreTests::selectionClippedChannelsPreserveOtherComponents()
                                        source16,
                                        edited16.rect(),
                                        selection.snapshot(),
-                                       size,
                                        QTransform(),
                                        SelectionEditKind::ComponentChannel,
                                        1));
@@ -1589,7 +1584,7 @@ void CoreTests::clipboardNewDocumentRasterPreservesPixelsProfileAndPrecision()
 
     ClipboardPayload scalar16;
     scalar16.imageKind = ClipboardImageKind::Grayscale;
-    scalar16.sourceKind = ClipboardSourceKind::Channel;
+    scalar16.sourceKind = ClipboardSourceKind::GreyChannel;
     scalar16.image = QImage(QSize(2, 1), QImage::Format_Grayscale16);
     scalar16.coverage = QImage(QSize(2, 1), QImage::Format_Grayscale16);
     auto *scalarValues = reinterpret_cast<quint16 *>(scalar16.image.bits());
@@ -2342,7 +2337,9 @@ void CoreTests::smartLiveFilterFxIntegratedRoundTripPreservesAppearance()
     pixels.setColorSpace(document.sourceImage().colorSpace());
     QPainter painter(&pixels);
     painter.fillRect(QRect(11, 9, 39, 31), QColor(210, 55, 35, 220));
-    painter.fillEllipse(QRect(29, 19, 31, 28), QColor(35, 170, 230, 155));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(35, 170, 230, 155));
+    painter.drawEllipse(QRect(29, 19, 31, 28));
     painter.end();
     pixels.setPixelColor(64, 7, QColor(180, 40, 210, 0));
     QVERIFY(document.updateLayer(rasterId, [&](LayerNode &layer) {
@@ -3287,7 +3284,7 @@ void CoreTests::smartLayerLiveFilterStackPersistsOrdersAndCachesCpuStages()
     liveFilterHistogram.documentSessionId = QUuid::createUuid();
     liveFilterHistogram.liveFilterOwnerId = smartId;
     liveFilterHistogram.liveFilterId = vibranceId;
-    liveFilterHistogram.documentRevision = document.revision();
+    liveFilterHistogram.documentRevision = 1;
     liveFilterHistogram.colourStateRevision = document.colourStateRevision();
     liveFilterHistogram.processingCompatibility =
         document.colourState().processingCompatibility;
@@ -4470,8 +4467,9 @@ void CoreTests::smartLayerCompositeFingerprintIsTileLocal()
     // left tile. Tile-local contribution hashing must therefore preserve the
     // already-rendered left composite tile.
     QVERIFY(document.updateLayer(smartId, [](LayerNode &layer) {
-        layer.transform = QTransform::fromTranslate(560.0, 70.0)
-            * QTransform::fromRotate(13.0);
+        QTransform rotation;
+        rotation.rotate(13.0);
+        layer.transform = QTransform::fromTranslate(560.0, 70.0) * rotation;
     }));
     const QImage second = engine.renderRegion(document.previewSource(), document.layers(),
                                               leftTile, document.sourceImage().size(),
@@ -4671,8 +4669,9 @@ void CoreTests::smartLayerColdEvictionPurgesRuntimeIntermediates()
     const QUuid smartId = session.document().convertLayersToEmbeddedSmart({rasterId}, &error);
     QVERIFY2(!smartId.isNull(), qPrintable(error));
     QVERIFY(session.document().updateLayer(smartId, [](LayerNode &layer) {
-        layer.transform = QTransform::fromScale(0.91, 0.87)
-            * QTransform::fromRotate(7.0);
+        QTransform rotation;
+        rotation.rotate(7.0);
+        layer.transform = QTransform::fromScale(0.91, 0.87) * rotation;
         layer.smartTransform.interpolation = TransformInterpolation::Lanczos3;
     }));
 
@@ -6637,8 +6636,8 @@ void CoreTests::canvasSizeRoundTripPreservesOffCanvasStorage()
                             QTransform::fromTranslate(-2.0, -1.0)));
     QVERIFY(loaded.selectionMask().isActive());
     QCOMPARE(loaded.selectionMask().nonZeroBounds(), QRect(0, 0, 2, 2));
-    QCOMPARE(loaded.horizontalGuides, QVector<double>({0.0, 1.0}));
-    QCOMPARE(loaded.verticalGuides, QVector<double>({0.0, 1.0}));
+    QCOMPARE(loaded.horizontalGuides(), QVector<double>({0.0, 1.0}));
+    QCOMPARE(loaded.verticalGuides(), QVector<double>({0.0, 1.0}));
 }
 
 void CoreTests::canvasSizePreservesSixteenBitHiddenRgbExactly()
@@ -9960,7 +9959,9 @@ void CoreTests::authoritativeFlattenedExportRoundTripsCombinedWorkflow()
     painted.rasterImage = QImage(size, QImage::Format_RGBA8888);
     painted.rasterImage.fill(Qt::transparent);
     QPainter rasterPainter(&painted.rasterImage);
-    rasterPainter.fillEllipse(QRect(94, 78, 146, 133), QColor(210, 35, 160, 190));
+    rasterPainter.setPen(Qt::NoPen);
+    rasterPainter.setBrush(QColor(210, 35, 160, 190));
+    rasterPainter.drawEllipse(QRect(94, 78, 146, 133));
     rasterPainter.end();
     painted.maskImage = QImage(size, QImage::Format_Grayscale8);
     painted.maskImage.fill(255);
@@ -10840,7 +10841,9 @@ void CoreTests::progressiveLevelZeroAssemblyMatchesFullRender()
     raster.rasterImage = QImage(source.size(), QImage::Format_RGBA8888);
     raster.rasterImage.fill(Qt::transparent);
     QPainter rasterPainter(&raster.rasterImage);
-    rasterPainter.fillEllipse(QRect(103, 47, 287, 251), QColor(210, 35, 160, 220));
+    rasterPainter.setPen(Qt::NoPen);
+    rasterPainter.setBrush(QColor(210, 35, 160, 220));
+    rasterPainter.drawEllipse(QRect(103, 47, 287, 251));
     rasterPainter.end();
     raster.transform = QTransform::fromTranslate(-13.0, 19.0);
 
@@ -14142,7 +14145,7 @@ void CoreTests::orthogonalDocumentTransformRepeatsWithoutAspectScaling()
                 x, y, QColor(20 + x * 30, 40 + y * 50, 80 + x + y, 255));
         }
     }
-    layer.rasterStorageOrigin = QPointF();
+    layer.rasterReferenceOrigin = QPointF();
     layer.rasterReferenceSize = settings.pixelSize;
     layer.transform = QTransform();
     QVector<LayerNode> layers {layer};
@@ -18599,13 +18602,13 @@ void CoreTests::rasterLayerMergePreservesIsolatedCompositeAndHiddenRgb()
     const QUuid highUpperId = highDocument.addRasterLayer();
     QVERIFY(highDocument.updateLayer(highLowerId, [](LayerNode &layer) {
         QImage pixels(QSize(24, 18), QImage::Format_RGBA64);
-        pixels.fill(QRgba64::fromRgba64(12000, 28000, 51000, 42000));
+        pixels.fill(QColor::fromRgba64(QRgba64::fromRgba64(12000, 28000, 51000, 42000)));
         layer.rasterImage = pixels;
         layer.rasterReferenceSize = pixels.size();
     }));
     QVERIFY(highDocument.updateLayer(highUpperId, [](LayerNode &layer) {
         QImage pixels(QSize(24, 18), QImage::Format_RGBA64);
-        pixels.fill(QRgba64::fromRgba64(60000, 9000, 22000, 17000));
+        pixels.fill(QColor::fromRgba64(QRgba64::fromRgba64(60000, 9000, 22000, 17000)));
         layer.rasterImage = pixels;
         layer.rasterReferenceSize = pixels.size();
         layer.opacity = 0.55;
@@ -18726,7 +18729,7 @@ void CoreTests::milestoneIntegrationRoundTripPreservesFillGradientAndMerge()
     QVERIFY(!upperRasterId.isNull());
 
     QImage lower(settings.pixelSize, QImage::Format_RGBA64);
-    lower.fill(QRgba64::fromRgba64(9000, 17000, 25000, 0));
+    lower.fill(QColor::fromRgba64(QRgba64::fromRgba64(9000, 17000, 25000, 0)));
     QImage fillCoverage(settings.pixelSize, QImage::Format_Grayscale8);
     fillCoverage.fill(0);
     for (int y = 9; y < 49; ++y) {
@@ -18741,7 +18744,7 @@ void CoreTests::milestoneIntegrationRoundTripPreservesFillGradientAndMerge()
     QVERIFY(filled.changed());
 
     QImage upper(settings.pixelSize, QImage::Format_RGBA64);
-    upper.fill(QRgba64::fromRgba64(6000, 30000, 42000, 0));
+    upper.fill(QColor::fromRgba64(QRgba64::fromRgba64(6000, 30000, 42000, 0)));
     QImage gradientCoverage(settings.pixelSize, QImage::Format_Grayscale8);
     gradientCoverage.fill(255);
     GradientApplyRequest gradientRequest;
