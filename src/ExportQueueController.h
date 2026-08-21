@@ -36,6 +36,14 @@ bool exportQueueWorkerFinishedCompletely(
     const ExportQueueWorkerResult &worker,
     qsizetype expectedOutputCount);
 
+// Execution-time collision predicate shared by the worker and regression
+// tests. Skip Existing is intentionally re-evaluated immediately before an
+// output is written; the preflight observation is not authoritative after a
+// queued job has waited or been recovered.
+bool exportQueueShouldSkipExistingOutput(
+    ProductionExportCollisionPolicy policy,
+    const QString &filePath);
+
 class ExportQueueController final : public QObject {
     Q_OBJECT
 

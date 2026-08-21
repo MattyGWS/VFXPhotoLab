@@ -65,7 +65,8 @@ private:
         const OcioConfigReference &,
         const ColourSpaceDescriptor &,
         const ColourSpaceDescriptor &,
-        QString *);
+        QString *,
+        bool);
     friend bool applyOcioCpuTransform(QImage *, const OcioCpuTransform &,
                                      const std::atomic_bool *, QString *);
     friend QColor mapOcioSemanticColour(const QColor &, const OcioCpuTransform &,
@@ -126,7 +127,8 @@ std::shared_ptr<const OcioCpuTransform> createOcioCpuTransform(
     const OcioConfigReference &config,
     const ColourSpaceDescriptor &source,
     const ColourSpaceDescriptor &destination,
-    QString *errorMessage = nullptr);
+    QString *errorMessage = nullptr,
+    bool requireIntegerWorkingProxy = true);
 
 bool applyOcioCpuTransform(QImage *image,
                            const OcioCpuTransform &transform,

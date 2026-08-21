@@ -44,6 +44,14 @@ bool exportQueueWorkerFinishedCompletely(
         });
 }
 
+bool exportQueueShouldSkipExistingOutput(
+    const ProductionExportCollisionPolicy policy,
+    const QString &filePath)
+{
+    return policy == ProductionExportCollisionPolicy::SkipExisting
+        && QFileInfo::exists(filePath);
+}
+
 struct ExportQueueController::JobRecord {
     ExportQueueJobInfo info;
     ExportQueueEnqueueRequest request;
@@ -681,9 +689,8 @@ void ExportQueueController::startJob(const std::shared_ptr<JobRecord> &record)
 
                 ImageExportRequest executionRequest = output.request;
                 const bool existsNow = QFileInfo::exists(executionRequest.filePath);
-                if (request.plan.collisionPolicy
-                        == ProductionExportCollisionPolicy::SkipExisting
-                    && existsNow) {
+                if (exportQueueShouldSkipExistingOutput(
+                        request.plan.collisionPolicy, executionRequest.filePath)) {
                     result.skipped = true;
                     worker.outputs.push_back(std::move(result));
                     ++progressValue;
@@ -785,9 +792,8 @@ void ExportQueueController::startJob(const std::shared_ptr<JobRecord> &record)
 
                 const bool existsBeforeWrite = QFileInfo::exists(
                     executionRequest.filePath);
-                if (request.plan.collisionPolicy
-                        == ProductionExportCollisionPolicy::SkipExisting
-                    && existsBeforeWrite) {
+                if (exportQueueShouldSkipExistingOutput(
+                        request.plan.collisionPolicy, executionRequest.filePath)) {
                     result.skipped = true;
                     worker.outputs.push_back(std::move(result));
                     ++progressValue;

@@ -161,7 +161,7 @@ struct VectorFill {
     void normalise();
     QJsonObject toJson(bool *ok = nullptr) const;
     static VectorFill fromJson(const QJsonObject &object, bool *ok = nullptr);
-    bool operator==(const VectorFill &) const = default;
+    bool operator==(const VectorFill &other) const;
 };
 
 struct VectorStroke {
@@ -188,7 +188,7 @@ struct VectorStroke {
     static VectorStroke fromJson(const QJsonObject &object,
                                  bool openPath,
                                  bool *ok = nullptr);
-    bool operator==(const VectorStroke &) const = default;
+    bool operator==(const VectorStroke &other) const;
 };
 
 struct VectorCornerRadii {

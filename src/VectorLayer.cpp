@@ -1800,6 +1800,18 @@ VectorFill VectorFill::fromJson(const QJsonObject &object, bool *ok)
     return result;
 }
 
+bool VectorFill::operator==(const VectorFill &other) const
+{
+    const QRgba64 left = colour.rgba64();
+    const QRgba64 right = other.colour.rgba64();
+    return enabled == other.enabled
+        && left.red() == right.red()
+        && left.green() == right.green()
+        && left.blue() == right.blue()
+        && left.alpha() == right.alpha()
+        && opacity == other.opacity;
+}
+
 void VectorStroke::normalise(const bool)
 {
     if (!colour.isValid()) colour = QColor(Qt::black);
@@ -1932,6 +1944,31 @@ VectorStroke VectorStroke::fromJson(const QJsonObject &object,
     result.normalise(openPath);
     if (ok) *ok = valid;
     return result;
+}
+
+bool VectorStroke::operator==(const VectorStroke &other) const
+{
+    const QRgba64 left = colour.rgba64();
+    const QRgba64 right = other.colour.rgba64();
+    return enabled == other.enabled
+        && left.red() == right.red()
+        && left.green() == right.green()
+        && left.blue() == right.blue()
+        && left.alpha() == right.alpha()
+        && opacity == other.opacity
+        && width == other.width
+        && alignment == other.alignment
+        && cap == other.cap
+        && join == other.join
+        && miterLimit == other.miterLimit
+        && pattern == other.pattern
+        && dashLength == other.dashLength
+        && gapLength == other.gapLength
+        && dashOffset == other.dashOffset
+        && startArrowhead == other.startArrowhead
+        && endArrowhead == other.endArrowhead
+        && startArrowScale == other.startArrowScale
+        && endArrowScale == other.endArrowScale;
 }
 
 void VectorCornerRadii::setAll(const double radius)

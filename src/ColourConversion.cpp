@@ -106,7 +106,8 @@ PreparedTransform createPreparedTransform(
     if (source.kind == ColourSpaceKind::Ocio
         || target.kind == ColourSpaceKind::Ocio) {
         prepared.ocio = createOcioCpuTransform(
-            ocioConfig, source, target, errorMessage);
+            ocioConfig, source, target, errorMessage,
+            purpose != ColourTransformPurpose::WorkingToOutput);
         return prepared;
     }
 

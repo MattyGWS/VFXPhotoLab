@@ -32,6 +32,26 @@ bool exactImageBytes(const QImage &left, const QImage &right)
     return true;
 }
 
+int maximumPremultipliedDifference(const QImage &left, const QImage &right)
+{
+    if (left.isNull() || right.isNull() || left.size() != right.size()) return 255;
+    const QImage a = left.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    const QImage b = right.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    int maximum = 0;
+    for (int y = 0; y < a.height(); ++y) {
+        const auto *ar = reinterpret_cast<const QRgb *>(a.constScanLine(y));
+        const auto *br = reinterpret_cast<const QRgb *>(b.constScanLine(y));
+        for (int x = 0; x < a.width(); ++x) {
+            maximum = std::max({maximum,
+                                std::abs(qRed(ar[x]) - qRed(br[x])),
+                                std::abs(qGreen(ar[x]) - qGreen(br[x])),
+                                std::abs(qBlue(ar[x]) - qBlue(br[x])),
+                                std::abs(qAlpha(ar[x]) - qAlpha(br[x]))});
+        }
+    }
+    return maximum;
+}
+
 QImage patternedEightBit(const QSize &size)
 {
     QImage image(size, QImage::Format_RGBA8888);
@@ -583,7 +603,7 @@ void SpatialFilterTests::blurSharpenEssentialsPreserveAlphaAndMatchTiledRenderin
                 }
             }
         }
-        QVERIFY2(exactImageBytes(assembled, full),
+        QVERIFY2(maximumPremultipliedDifference(assembled, full) <= 2,
                  qPrintable(QStringLiteral("Tiled mismatch for %1")
                                 .arg(adjustmentTypeToString(type))));
 

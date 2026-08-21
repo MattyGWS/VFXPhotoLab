@@ -544,7 +544,8 @@ std::shared_ptr<const OcioCpuTransform> createOcioCpuTransform(
     const OcioConfigReference &configReference,
     const ColourSpaceDescriptor &source,
     const ColourSpaceDescriptor &destination,
-    QString *errorMessage)
+    QString *errorMessage,
+    const bool requireIntegerWorkingProxy)
 {
 #ifdef VFXPHOTOLAB_HAS_OCIO
     if (!configReference.isConfigured()) {
@@ -624,7 +625,7 @@ std::shared_ptr<const OcioCpuTransform> createOcioCpuTransform(
         }
         if (destination.kind == ColourSpaceKind::Ocio) {
             impl->targetQtSpace = ocioQtWorkingSpaceProxy(destination);
-            if (!impl->targetQtSpace.isValid()) {
+            if (requireIntegerWorkingProxy && !impl->targetQtSpace.isValid()) {
                 setError(errorMessage,
                          QStringLiteral("The selected OCIO destination cannot be represented safely as an integer document working space."));
                 return {};
@@ -645,6 +646,7 @@ std::shared_ptr<const OcioCpuTransform> createOcioCpuTransform(
     Q_UNUSED(configReference)
     Q_UNUSED(source)
     Q_UNUSED(destination)
+    Q_UNUSED(requireIntegerWorkingProxy)
     setError(errorMessage,
              QStringLiteral("This build does not contain OpenColorIO support."));
     return {};

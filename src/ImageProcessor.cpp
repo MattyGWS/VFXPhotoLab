@@ -1833,6 +1833,62 @@ bool adjustmentIsExactIdentity(const AdjustmentData &adjustment)
     return false;
 }
 
+bool layerTreeIsExactSourceIdentity(const QImage &source,
+                                    const QVector<LayerNode> &layers,
+                                    const QSize &documentSize)
+{
+    // This deliberately recognises only the simple source + no-op-adjustment
+    // stack. Returning the stored straight-RGBA source directly avoids an
+    // otherwise pointless premultiply/unpremultiply round trip, which can
+    // change low-alpha RGB by a code value on different Qt raster backends.
+    // Any authored geometry, mask, effect, transform, blend or replacement
+    // raster falls through to the normal compositor.
+    const QSize reference = documentSize.isValid() && !documentSize.isEmpty()
+        ? documentSize : source.size();
+    if (reference != source.size()) return false;
+
+    int visibleBaseCount = 0;
+    for (const LayerNode &layer : layers) {
+        if (!layer.visible || layer.opacity <= 0.0) continue;
+
+        if (layer.type == LayerType::Adjustment) {
+            // An identity adjustment is only a visual no-op under Copy. With
+            // Multiply/Screen/etc. the adjusted image (equal to the base) is
+            // still fed through the blend operator and can change the result.
+            if (layer.blendMode != BlendMode::Copy
+                || !layer.layerEffects.isEmpty()
+                || !adjustmentIsExactIdentity(layer.effectiveAdjustmentData())) {
+                return false;
+            }
+            continue;
+        }
+
+        if (layer.type != LayerType::BaseImage) return false;
+        ++visibleBaseCount;
+        if (visibleBaseCount != 1
+            || std::abs(layer.opacity - 1.0) > 1.0e-12
+            || layer.blendMode != BlendMode::Copy
+            || !layer.transform.isIdentity()
+            || (!layer.maskImage.isNull() && layer.maskEnabled)
+            || !layer.layerEffects.isEmpty()
+            || !layer.liveFilters.isEmpty()
+            || !layer.children.isEmpty()
+            || (!layer.rasterReferenceSize.isEmpty()
+                && layer.rasterReferenceSize != source.size())
+            || std::abs(layer.rasterReferenceOrigin.x()) > 1.0e-12
+            || std::abs(layer.rasterReferenceOrigin.y()) > 1.0e-12) {
+            return false;
+        }
+        if (!layer.rasterImage.isNull()
+            && (layer.rasterImage.size() != source.size()
+                || layer.rasterImage.format() != source.format()
+                || layer.rasterImage.cacheKey() != source.cacheKey())) {
+            return false;
+        }
+    }
+    return visibleBaseCount == 1;
+}
+
 QImage applyAdjustmentToImage(const QImage &input,
                               const LayerNode &layer,
                               const std::atomic_bool *cancelRequested,
@@ -2123,6 +2179,12 @@ void compositeAdjustment(QImage &canvas,
         return;
     }
 
+    const AdjustmentData adjustment = layer.effectiveAdjustmentData();
+    if (layer.blendMode == BlendMode::Copy
+        && adjustmentIsExactIdentity(adjustment)) {
+        return;
+    }
+
     const bool sixteenBit = canvas.depth() > 32;
     QImage base = canvas.convertToFormat(sixteenBit ? QImage::Format_RGBA64
                                                     : QImage::Format_RGBA8888);
@@ -2132,7 +2194,6 @@ void compositeAdjustment(QImage &canvas,
                                      canvas.size(),
                                      layer.maskEnabled,
                                      layer.maskInverted);
-    const AdjustmentData adjustment = layer.effectiveAdjustmentData();
     bool affectsAlpha = false;
     if (adjustment.type == AdjustmentType::GaussianBlur) {
         affectsAlpha = std::get<GaussianBlurParameters>(adjustment.parameters).affectAlpha;
@@ -5169,6 +5230,18 @@ QImage ImageProcessor::renderRegionPreservingHiddenRgb(
     const QSize referenceSize = documentSize.isValid() && !documentSize.isEmpty()
         ? documentSize
         : source.size();
+
+    if (layerTreeIsExactSourceIdentity(source, layers, referenceSize)) {
+        QImage exact = requestedRegion == source.rect()
+            ? source
+            : source.copy(requestedRegion);
+        exact.setColorSpace(source.colorSpace());
+        exact.setDevicePixelRatio(source.devicePixelRatio());
+        exact.setDotsPerMeterX(source.dotsPerMeterX());
+        exact.setDotsPerMeterY(source.dotsPerMeterY());
+        return exact;
+    }
+
     // Spatial adjustment layers require neighbouring pixels beyond the
     // requested export/analysis tile. Render the complete dependency halo and
     // crop only after both the composited-alpha and hidden-RGB reference paths

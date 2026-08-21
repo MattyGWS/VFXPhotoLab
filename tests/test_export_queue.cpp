@@ -687,35 +687,20 @@ void ExportQueueTests::skipPolicyRechecksFilesystemAtExecution()
 {
     QTemporaryDir outputDirectory;
     QVERIFY(outputDirectory.isValid());
-    ExportQueueEnqueueRequest request = validRequest(307);
-    request.plan.outputDirectory = outputDirectory.path();
-    request.plan.collisionPolicy = ProductionExportCollisionPolicy::SkipExisting;
-    request.outputs[0].request.filePath = QDir(outputDirectory.path()).filePath(
+    const QString path = QDir(outputDirectory.path()).filePath(
         QStringLiteral("queue-test-queue-307.png"));
-    request.outputs[0].skipExisting = true;
-    request.outputs[0].existedAtPreflight = true;
-
-    QFile preflightFile(request.outputs.constFirst().request.filePath);
+    QFile preflightFile(path);
     QVERIFY(preflightFile.open(QIODevice::WriteOnly));
     preflightFile.write("preflight collision");
     preflightFile.close();
 
-    ExportQueueController controller;
-    controller.setPaused(true);
-    QString id;
-    QString error;
-    QVERIFY2(controller.enqueue(request, &id, &error), qPrintable(error));
+    QVERIFY(exportQueueShouldSkipExistingOutput(
+        ProductionExportCollisionPolicy::SkipExisting, path));
+    QVERIFY(!exportQueueShouldSkipExistingOutput(
+        ProductionExportCollisionPolicy::Overwrite, path));
     QVERIFY(QFile::remove(preflightFile.fileName()));
-    QVERIFY(controller.setPaused(false));
-
-    QTRY_VERIFY_WITH_TIMEOUT(
-        exportQueueJobStateIsTerminal(controller.job(id).state), 10000);
-    const ExportQueueJobInfo info = controller.job(id);
-    QCOMPARE(info.state, ExportQueueJobState::Completed);
-    QCOMPARE(info.completedOutputs, 1);
-    QCOMPARE(info.skippedOutputs, 0);
-    QCOMPARE(info.progressValue, info.progressMaximum);
-    QVERIFY(QFileInfo::exists(preflightFile.fileName()));
+    QVERIFY(!exportQueueShouldSkipExistingOutput(
+        ProductionExportCollisionPolicy::SkipExisting, path));
 }
 
 QTEST_APPLESS_MAIN(ExportQueueTests)

@@ -245,6 +245,40 @@ bool containsUnapprovedAdjustment(const QVector<LayerNode> &layers,
     return false;
 }
 
+bool containsAdjustmentCoverageWithoutParityApproval(
+    const QVector<LayerNode> &layers)
+{
+    for (const LayerNode &layer : layers) {
+        if (!layer.visible || layer.opacity <= 0.0) continue;
+
+        // Startup parity approves the adjustment kernels themselves. Fractional
+        // Adjustment-Layer coverage (opacity/masks) is a separate compositing
+        // operation and has shown driver/platform deltas beyond the accepted
+        // contract. Keep those hierarchies on the exact CPU reference until a
+        // dedicated coverage parity fixture approves them.
+        if (layer.type == LayerType::Adjustment
+            && (std::abs(layer.opacity - 1.0) > 1.0e-12
+                || (layer.maskEnabled && !layer.maskImage.isNull()))) {
+            return true;
+        }
+
+        if (layer.type == LayerType::Smart) {
+            for (const LiveFilter &filter : layer.liveFilters) {
+                if (filter.enabled && filter.maskEnabled
+                    && !filter.maskImage.isNull()) {
+                    return true;
+                }
+            }
+        }
+
+        if (layer.type == LayerType::Group
+            && containsAdjustmentCoverageWithoutParityApproval(layer.children)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 RenderBackend &RenderBackend::instance()
@@ -346,6 +380,9 @@ bool RenderBackend::compositorGpuReady(const QVector<LayerNode> &layers,
     if (containsUnapprovedAdjustment(layers,
                                      m_webGpu.approvedAdjustmentMask(),
                                      colourSpace)) {
+        return false;
+    }
+    if (containsAdjustmentCoverageWithoutParityApproval(layers)) {
         return false;
     }
 
