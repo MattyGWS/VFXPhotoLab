@@ -584,7 +584,8 @@ TiledCanvasEngine::BrushResult RenderBackend::stampRasterStroke(
                                             hardness,
                                             colour,
                                             erasing,
-                                            allowGpu && brushGpuReady(),
+                                            allowGpu && brushGpuReady()
+                                                && (!selectionSnapshot || !selectionSnapshot->active),
                                             sessionContext.documentSessionId,
                                             selectionSnapshot,
                                             layerToDocument);
@@ -620,7 +621,8 @@ TiledCanvasEngine::BrushResult RenderBackend::stampRasterStroke(
                                             hardness,
                                             colour,
                                             erasing,
-                                            allowGpu && brushGpuReady(),
+                                            allowGpu && brushGpuReady()
+                                                && (!selectionSnapshot || !selectionSnapshot->active),
                                             QUuid(),
                                             selectionSnapshot,
                                             layerToDocument);

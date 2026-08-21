@@ -432,6 +432,8 @@ void ExportQueueTests::recoveredAskCollisionsRequireFreshConfirmation()
     request.plan.collisionPolicy = ProductionExportCollisionPolicy::AskBeforeStart;
     const QString existingPath = QDir(outputDirectory.path()).filePath(
         QStringLiteral("queue-test-queue-205.png"));
+    request.outputs[0].request.filePath = existingPath;
+    request.outputs[0].existedAtPreflight = true;
     QFile existing(existingPath);
     QVERIFY(existing.open(QIODevice::WriteOnly));
     QCOMPARE(existing.write("existing"), qint64(8));
@@ -663,18 +665,21 @@ void ExportQueueTests::recoveryResolutionMatchesQueuedSnapshot()
                  jobs.constFirst().request.plan,
                  jobs.constFirst().request.colourState,
                  &reResolved, nullptr, &error), qPrintable(error));
-    QCOMPARE(reResolved.size(), jobs.constFirst().request.outputs.size());
+    // Recovery intentionally persists the immutable production plan, not the
+    // stale preflight resolved-output list. Re-resolve against the filesystem
+    // when the job is resumed.
+    QVERIFY(jobs.constFirst().request.outputs.isEmpty());
+    QCOMPARE(reResolved.size(), request.outputs.size());
     QVERIFY2(validateResolvedProductionExportOutputs(
                  jobs.constFirst().request.plan,
                  jobs.constFirst().request.colourState,
-                 jobs.constFirst().request.outputs,
+                 reResolved,
                  &error), qPrintable(error));
-    QCOMPARE(reResolved.constFirst().id,
-             jobs.constFirst().request.outputs.constFirst().id);
+    QCOMPARE(reResolved.constFirst().id, request.outputs.constFirst().id);
     QCOMPARE(reResolved.constFirst().request.filePath,
-             jobs.constFirst().request.outputs.constFirst().request.filePath);
+             request.outputs.constFirst().request.filePath);
     QCOMPARE(reResolved.constFirst().request.quality,
-             jobs.constFirst().request.outputs.constFirst().request.quality);
+             request.outputs.constFirst().request.quality);
     QVERIFY(ExportQueuePersistence::removeJob(id, &error));
 }
 

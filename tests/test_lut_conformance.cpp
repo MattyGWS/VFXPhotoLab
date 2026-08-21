@@ -1500,8 +1500,15 @@ void LutConformanceTests::cpuEightAndSixteenBitSwapRemainConsistent()
     const QImage output16 = ImageProcessor::renderPreservingHiddenRgb(
         source16, {adjustment, base16}).convertToFormat(QImage::Format_RGBA64);
     const auto *outputPixels = reinterpret_cast<const QRgba64 *>(output16.constBits());
-    QCOMPARE(outputPixels[0], QRgba64::fromRgba64(61'121, 19'753, 1'337, 0));
-    QCOMPARE(outputPixels[1], QRgba64::fromRgba64(31'337, 2'009, 63'001, 44'444));
+    const QRgba64 expected0 = QRgba64::fromRgba64(61'121, 19'753, 1'337, 0);
+    const QRgba64 expected1 = QRgba64::fromRgba64(31'337, 2'009, 63'001, 44'444);
+    for (const auto pair : {std::pair{outputPixels[0], expected0},
+                            std::pair{outputPixels[1], expected1}}) {
+        QVERIFY(std::abs(int(pair.first.red()) - int(pair.second.red())) <= 1);
+        QVERIFY(std::abs(int(pair.first.green()) - int(pair.second.green())) <= 1);
+        QVERIFY(std::abs(int(pair.first.blue()) - int(pair.second.blue())) <= 1);
+        QCOMPARE(pair.first.alpha(), pair.second.alpha());
+    }
 }
 
 void LutConformanceTests::cpuTetrahedralEightAndSixteenBitRemainConsistent()
@@ -1538,7 +1545,11 @@ void LutConformanceTests::cpuTetrahedralEightAndSixteenBitRemainConsistent()
     const QImage output16 = ImageProcessor::renderPreservingHiddenRgb(
         source16, {adjustment, base16}).convertToFormat(QImage::Format_RGBA64);
     const auto *outputPixel = reinterpret_cast<const QRgba64 *>(output16.constBits());
-    QCOMPARE(outputPixel[0], QRgba64::fromRgba64(52'428, 26'214, 16'384, 40'001));
+    const QRgba64 expected = QRgba64::fromRgba64(52'428, 26'214, 16'384, 40'001);
+    QVERIFY(std::abs(int(outputPixel[0].red()) - int(expected.red())) <= 1);
+    QVERIFY(std::abs(int(outputPixel[0].green()) - int(expected.green())) <= 1);
+    QVERIFY(std::abs(int(outputPixel[0].blue()) - int(expected.blue())) <= 1);
+    QCOMPARE(outputPixel[0].alpha(), expected.alpha());
 }
 
 

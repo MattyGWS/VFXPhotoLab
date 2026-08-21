@@ -487,12 +487,24 @@ bool VectorAppearancePresetStore::recordUse(
         if (error) *error = QStringLiteral("The selected preset cannot be changed");
         return false;
     }
-    PresetMetadata metadata = preset.metadata;
-    if (metadata.id.isEmpty()) metadata = metadataForLegacy(preset.name, preset.appearance);
-    metadata.name = preset.name;
+    VectorAppearancePreset current = preset;
+    const QString stableId = preset.metadata.id;
+    const QVector<VectorAppearancePreset> latest = presets();
+    const auto latestIt = std::find_if(latest.cbegin(), latest.cend(),
+        [&](const VectorAppearancePreset &candidate) {
+            return (!stableId.isEmpty() && candidate.metadata.id == stableId)
+                || (!preset.storagePath.isEmpty()
+                    && QFileInfo(candidate.storagePath).absoluteFilePath()
+                        == QFileInfo(preset.storagePath).absoluteFilePath());
+        });
+    if (latestIt != latest.cend()) current = *latestIt;
+
+    PresetMetadata metadata = current.metadata;
+    if (metadata.id.isEmpty()) metadata = metadataForLegacy(current.name, current.appearance);
+    metadata.name = current.name;
     metadata.lastUsedUtcMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
     if (metadata.useCount < MaximumJsonInteger) ++metadata.useCount;
-    return writeUserPreset(metadata, preset.appearance, preset.storagePath, error);
+    return writeUserPreset(metadata, current.appearance, current.storagePath, error);
 }
 
 bool VectorAppearancePresetStore::importPresetFile(

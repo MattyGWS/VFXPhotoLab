@@ -660,11 +660,23 @@ bool ExportProfileStore::recordUse(const ExportProfile &profile,
                  QStringLiteral("The selected export profile cannot be changed."));
         return false;
     }
-    PresetMetadata metadata = profile.metadata;
-    metadata.name = profile.name;
+    ExportProfile current = profile;
+    const QString stableId = profile.metadata.id;
+    const QVector<ExportProfile> latest = profiles();
+    const auto latestIt = std::find_if(latest.cbegin(), latest.cend(),
+        [&](const ExportProfile &candidate) {
+            return (!stableId.isEmpty() && candidate.metadata.id == stableId)
+                || (!profile.storagePath.isEmpty()
+                    && QFileInfo(candidate.storagePath).absoluteFilePath()
+                        == QFileInfo(profile.storagePath).absoluteFilePath());
+        });
+    if (latestIt != latest.cend() && !latestIt->builtIn) current = *latestIt;
+
+    PresetMetadata metadata = current.metadata;
+    metadata.name = current.name;
     metadata.lastUsedUtcMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
     if (metadata.useCount < 9007199254740991ULL) ++metadata.useCount;
-    return writeUserProfile(metadata, profile.data, profile.storagePath, error);
+    return writeUserProfile(metadata, current.data, current.storagePath, error);
 }
 
 bool ExportProfileStore::removeUserProfile(const ExportProfile &profile,

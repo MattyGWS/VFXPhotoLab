@@ -522,7 +522,22 @@ QColorSpace ocioQtWorkingSpaceProxy(const ColourSpaceDescriptor &descriptor)
             QColorSpace::TransferFunction::Linear);
         proxy.setDescription(QStringLiteral("ACES2065-1 working proxy"));
     }
-    return proxy.isValid() ? proxy : QColorSpace();
+    if (proxy.isValid()) return proxy;
+
+    // Qt 6.8 on Windows rejects ACES AP0/AP1 chromaticities because some of
+    // their mathematically valid primaries lie just outside Qt's accepted xy
+    // gamut. The QColorSpace attached here is deliberately only an integer-
+    // image adjustment-domain proxy; OCIO remains authoritative for the actual
+    // source/destination primaries. Fall back to a valid linear transfer proxy
+    // so ACES integer documents can keep their explicit OCIO descriptor without
+    // being rejected solely by Qt's metadata validator.
+    if (name.compare(QStringLiteral("ACEScg"), Qt::CaseInsensitive) == 0
+        || name.compare(QStringLiteral("ACES2065-1"), Qt::CaseInsensitive) == 0) {
+        QColorSpace linearProxy(QColorSpace::SRgbLinear);
+        linearProxy.setDescription(name + QStringLiteral(" linear working proxy"));
+        return linearProxy;
+    }
+    return {};
 }
 
 std::shared_ptr<const OcioCpuTransform> createOcioCpuTransform(

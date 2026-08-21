@@ -946,12 +946,28 @@ bool AdjustmentPresetStore::recordUse(const AdjustmentPreset &preset,
         if (error) *error = QStringLiteral("The selected preset cannot be changed");
         return false;
     }
-    PresetMetadata metadata = preset.metadata;
-    if (metadata.id.isEmpty()) metadata = metadataForLegacy(preset.name, preset.adjustment);
-    metadata.name = preset.name;
+    // Callers can legitimately hold a preset object across a metadata edit
+    // (for example Favourite followed immediately by Apply). Refresh the
+    // persisted envelope by stable identity before updating usage so stale
+    // caller metadata cannot clobber a just-written favourite/category/tag.
+    AdjustmentPreset current = preset;
+    const QString stableId = preset.metadata.id;
+    const QVector<AdjustmentPreset> latest = presets(preset.adjustment.type);
+    const auto latestIt = std::find_if(latest.cbegin(), latest.cend(),
+        [&](const AdjustmentPreset &candidate) {
+            return (!stableId.isEmpty() && candidate.metadata.id == stableId)
+                || (!preset.storagePath.isEmpty()
+                    && QFileInfo(candidate.storagePath).absoluteFilePath()
+                        == QFileInfo(preset.storagePath).absoluteFilePath());
+        });
+    if (latestIt != latest.cend() && !latestIt->builtIn) current = *latestIt;
+
+    PresetMetadata metadata = current.metadata;
+    if (metadata.id.isEmpty()) metadata = metadataForLegacy(current.name, current.adjustment);
+    metadata.name = current.name;
     metadata.lastUsedUtcMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
     if (metadata.useCount < 9007199254740991ULL) ++metadata.useCount;
-    return writeUserPreset(metadata, preset.adjustment, preset.storagePath, error);
+    return writeUserPreset(metadata, current.adjustment, current.storagePath, error);
 }
 
 bool AdjustmentPresetStore::importPresetFile(const QString &sourcePath,

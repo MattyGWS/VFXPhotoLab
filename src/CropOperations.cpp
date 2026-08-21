@@ -465,9 +465,12 @@ SelectionMask::Snapshot transformedSelection(
     }
     painter.end();
     destination.selectNone();
-    if (!destination.setCoverageImage(transformed.rect(), transformed)) {
-        return {};
-    }
+    // setCoverageImage() reports whether the sparse selection state changed,
+    // not whether the write succeeded. A crop can legitimately move an active
+    // selection completely outside the new canvas, leaving the already-empty
+    // destination unchanged. Treat that as a valid empty active selection
+    // instead of an allocation failure.
+    destination.setCoverageImage(transformed.rect(), transformed);
     return destination.snapshot();
 }
 

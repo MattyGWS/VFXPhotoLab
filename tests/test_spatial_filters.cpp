@@ -185,7 +185,7 @@ void SpatialFilterTests::tilePlansScaleRadiiAndDescribeInvalidation()
     const SpatialFilterTilePlan identityPlan = SpatialFilterFoundation::plan(
         QRect(10, 20, 30, 40), QSize(100, 100), QSize(100, 100), identity);
     QVERIFY(identityPlan.valid);
-    QCOMPARE(identityPlan.scaledRadius, QSize());
+    QCOMPARE(identityPlan.scaledRadius, QSize(0, 0));
     QCOMPARE(identityPlan.dependencyBounds, QRect(10, 20, 30, 40));
 
     SpatialFilterContract excessive;

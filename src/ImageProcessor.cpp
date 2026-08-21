@@ -1715,6 +1715,124 @@ QImage transparentImage(const QSize &size, const QImage::Format format, const QC
     return image;
 }
 
+bool adjustmentIsExactIdentity(const AdjustmentData &adjustment)
+{
+    constexpr double eps = 1.0e-12;
+    switch (adjustment.type) {
+    case AdjustmentType::Exposure: {
+        const auto &p = std::get<ExposureParameters>(adjustment.parameters);
+        return std::abs(p.exposure) <= eps && std::abs(p.offset) <= eps
+            && std::abs(p.gamma - 1.0) <= eps;
+    }
+    case AdjustmentType::Contrast:
+        return std::abs(std::get<ContrastParameters>(adjustment.parameters).contrast) <= eps;
+    case AdjustmentType::Saturation:
+        return std::abs(std::get<SaturationParameters>(adjustment.parameters).saturation) <= eps;
+    case AdjustmentType::Levels: {
+        const auto &p = std::get<LevelsParameters>(adjustment.parameters);
+        const LevelsChannelParameters identity;
+        return std::all_of(p.channels.cbegin(), p.channels.cend(),
+                           [&](const LevelsChannelParameters &channel) {
+                               return channel == identity;
+                           });
+    }
+    case AdjustmentType::Curves: {
+        const auto &p = std::get<CurvesParameters>(adjustment.parameters);
+        const CurveChannelParameters identity;
+        return std::all_of(p.channels.cbegin(), p.channels.cend(),
+                           [&](const CurveChannelParameters &channel) {
+                               return channel == identity;
+                           });
+    }
+    case AdjustmentType::HueSaturation: {
+        const auto &p = std::get<HueSaturationParameters>(adjustment.parameters);
+        if (std::abs(p.hue) > eps || std::abs(p.saturation) > eps
+            || std::abs(p.lightness) > eps) {
+            return false;
+        }
+        return std::all_of(p.ranges.cbegin(), p.ranges.cend(),
+                           [&](const HueSaturationRangeParameters &range) {
+                               return std::abs(range.hue) <= eps
+                                   && std::abs(range.saturation) <= eps
+                                   && std::abs(range.lightness) <= eps;
+                           });
+    }
+    case AdjustmentType::Vibrance: {
+        const auto &p = std::get<VibranceParameters>(adjustment.parameters);
+        return std::abs(p.vibrance) <= eps && std::abs(p.saturation) <= eps;
+    }
+    case AdjustmentType::WhiteBalance: {
+        const auto &p = std::get<WhiteBalanceParameters>(adjustment.parameters);
+        return std::abs(p.temperature) <= eps && std::abs(p.tint) <= eps;
+    }
+    case AdjustmentType::ColourBalance: {
+        const auto &p = std::get<ColourBalanceParameters>(adjustment.parameters);
+        return std::all_of(p.ranges.cbegin(), p.ranges.cend(),
+                           [&](const ColourBalanceRangeParameters &range) {
+                               return std::abs(range.cyanRed) <= eps
+                                   && std::abs(range.magentaGreen) <= eps
+                                   && std::abs(range.yellowBlue) <= eps;
+                           });
+    }
+    case AdjustmentType::ChannelMixer: {
+        const auto &p = std::get<ChannelMixerParameters>(adjustment.parameters);
+        const ChannelMixerParameters identity;
+        return p == identity;
+    }
+    case AdjustmentType::PhotoFilter:
+        return std::get<PhotoFilterParameters>(adjustment.parameters).density <= eps;
+    case AdjustmentType::SelectiveColour: {
+        const auto &p = std::get<SelectiveColourParameters>(adjustment.parameters);
+        return std::all_of(p.ranges.cbegin(), p.ranges.cend(),
+                           [&](const SelectiveColourRangeParameters &range) {
+                               return std::abs(range.cyan) <= eps
+                                   && std::abs(range.magenta) <= eps
+                                   && std::abs(range.yellow) <= eps
+                                   && std::abs(range.black) <= eps;
+                           });
+    }
+    case AdjustmentType::Vignette:
+        return std::abs(std::get<VignetteParameters>(adjustment.parameters).amount) <= eps;
+    case AdjustmentType::RgbSplit: {
+        const auto &p = std::get<RgbSplitParameters>(adjustment.parameters);
+        return std::abs(p.redOffsetX) <= eps && std::abs(p.redOffsetY) <= eps
+            && std::abs(p.blueOffsetX) <= eps && std::abs(p.blueOffsetY) <= eps;
+    }
+    case AdjustmentType::ChromaticAberrationCorrection: {
+        const auto &p = std::get<ChromaticAberrationCorrectionParameters>(adjustment.parameters);
+        return std::abs(p.redEdgeShift) <= eps && std::abs(p.blueEdgeShift) <= eps;
+    }
+    case AdjustmentType::SurfaceBlur:
+        return std::get<SurfaceBlurParameters>(adjustment.parameters).radius <= eps;
+    case AdjustmentType::MotionBlur:
+        return std::get<MotionBlurParameters>(adjustment.parameters).distance <= eps;
+    case AdjustmentType::RadialBlur:
+        return std::get<RadialBlurParameters>(adjustment.parameters).amount <= eps;
+    case AdjustmentType::ShadowsHighlights: {
+        const auto &p = std::get<ShadowsHighlightsParameters>(adjustment.parameters);
+        return std::abs(p.shadowAmount) <= eps && std::abs(p.highlightAmount) <= eps
+            && std::abs(p.midtoneContrast) <= eps;
+    }
+    case AdjustmentType::GaussianBlur:
+        return std::get<GaussianBlurParameters>(adjustment.parameters).radius <= eps;
+    case AdjustmentType::BoxBlur:
+        return std::get<BoxBlurParameters>(adjustment.parameters).radius <= eps;
+    case AdjustmentType::UnsharpMask: {
+        const auto &p = std::get<UnsharpMaskParameters>(adjustment.parameters);
+        return p.radius <= eps || p.amount <= eps;
+    }
+    case AdjustmentType::BlackAndWhite:
+    case AdjustmentType::GradientMap:
+    case AdjustmentType::Posterise:
+    case AdjustmentType::Threshold:
+    case AdjustmentType::Invert:
+    case AdjustmentType::Lut:
+    case AdjustmentType::HighPass:
+        return false;
+    }
+    return false;
+}
+
 QImage applyAdjustmentToImage(const QImage &input,
                               const LayerNode &layer,
                               const std::atomic_bool *cancelRequested,
@@ -1728,6 +1846,13 @@ QImage applyAdjustmentToImage(const QImage &input,
     }
 
     AdjustmentData adjustment = layer.effectiveAdjustmentData();
+    // Preserve exact component values and hidden RGB for semantic no-op
+    // adjustments. In particular this avoids a managed-domain decode/encode
+    // round trip changing an identity adjustment by one code value on some
+    // Qt/platform colour backends.
+    if (adjustmentIsExactIdentity(adjustment)) {
+        return input;
+    }
     const QColorSpace workingSpace = input.colorSpace();
     const AdjustmentProcessingDomain domain = adjustmentProcessingDomain(adjustment);
     const bool managedRequested =
@@ -2939,6 +3064,63 @@ QImage imageRegion(const QImage &image,
                                                              worldTransform,
                                                              documentSize,
                                                              region);
+    // Preserve exact pixels for the overwhelmingly common 1:1 integer
+    // translation case instead of sending them through QPainter's platform
+    // raster pipeline. This makes full-frame and tiled CPU rendering byte
+    // stable across Qt backends while retaining the general transformed path
+    // below for scaling/rotation/projective layers.
+    if (imageToRegion.type() <= QTransform::TxTranslate) {
+        const double roundedDx = std::round(imageToRegion.dx());
+        const double roundedDy = std::round(imageToRegion.dy());
+        if (std::abs(imageToRegion.dx() - roundedDx) <= 1.0e-9
+            && std::abs(imageToRegion.dy() - roundedDy) <= 1.0e-9) {
+            const int dx = static_cast<int>(roundedDx);
+            const int dy = static_cast<int>(roundedDy);
+            const QRect sourceRect = QRect(-dx, -dy, region.width(), region.height())
+                .intersected(image.rect());
+            QImage output = transparentImage(region.size(), format, space);
+            if (sourceRect.isEmpty()) return output;
+
+            QImage patch = image.copy(sourceRect);
+            if (forceOpaquePixelAlpha) {
+                patch = patch.convertToFormat(
+                    image.depth() > 32 ? QImage::Format_RGBA64
+                                       : QImage::Format_RGBA8888);
+                patch.detach();
+                if (patch.depth() > 32) {
+                    for (int y = 0; y < patch.height(); ++y) {
+                        auto *row = reinterpret_cast<QRgba64 *>(patch.scanLine(y));
+                        for (int x = 0; x < patch.width(); ++x) {
+                            const QRgba64 pixel = row[x];
+                            row[x] = QRgba64::fromRgba64(
+                                pixel.red(), pixel.green(), pixel.blue(), 65535);
+                        }
+                    }
+                } else {
+                    for (int y = 0; y < patch.height(); ++y) {
+                        uchar *row = patch.scanLine(y);
+                        for (int x = 0; x < patch.width(); ++x) row[x * 4 + 3] = 255;
+                    }
+                }
+            }
+            patch = patch.convertToFormat(format);
+            patch.setColorSpace(space);
+            const QPoint destinationTopLeft(sourceRect.left() + dx,
+                                             sourceRect.top() + dy);
+            const int bytesPerPixel = output.depth() / 8;
+            const qsizetype copyBytes = static_cast<qsizetype>(patch.width())
+                * bytesPerPixel;
+            for (int y = 0; y < patch.height(); ++y) {
+                std::memcpy(output.scanLine(destinationTopLeft.y() + y)
+                                + static_cast<qsizetype>(destinationTopLeft.x())
+                                    * bytesPerPixel,
+                            patch.constScanLine(y),
+                            static_cast<std::size_t>(copyBytes));
+            }
+            return output;
+        }
+    }
+
     QImage drawImage = image;
     QTransform drawTransform = imageToRegion;
     if (forceOpaquePixelAlpha) {

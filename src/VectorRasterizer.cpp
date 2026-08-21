@@ -861,7 +861,11 @@ QImage featherSemanticCoverage(const LayerNode &layer,
                 prefix0[sx + 1] = prefix0[sx] + alpha;
                 prefix1[sx + 1] = prefix1[sx] + alpha * localX;
                 prefix2[sx + 1] = prefix2[sx] + alpha * localX * localX;
-                if (sourcePixelAlpha(straight, sx, sy) > 0.0) {
+                // Use the RGBA8 half-code threshold for both 8- and 16-bit
+                // references. Tiny 16-bit-only antialias coverage that would
+                // quantise to zero in RGBA8 must not select a different nearest
+                // authored colour carrier at a feather edge.
+                if (sourcePixelAlpha(coverageStraight, sx, sy) >= (0.5 / 255.0)) {
                     visibleXs.push_back(sx);
                 }
             }

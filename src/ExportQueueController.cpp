@@ -25,14 +25,7 @@ namespace {
 constexpr int MaximumQueuedJobs = 16;
 constexpr int MaximumRetainedJobs = 128;
 
-int executableOutputCount(const QVector<ResolvedProductionExportOutput> &outputs)
-{
-    return static_cast<int>(std::count_if(
-        outputs.cbegin(), outputs.cend(),
-        [](const ResolvedProductionExportOutput &output) {
-            return !output.skipExisting;
-        }));
-}
+
 
 } // namespace
 
@@ -175,14 +168,9 @@ bool ExportQueueController::enqueue(const ExportQueueEnqueueRequest &request,
         }
         return false;
     }
-    const int executable = executableOutputCount(request.outputs);
-    if (executable < 1) {
-        if (errorMessage) {
-            *errorMessage = QStringLiteral(
-                "Every resolved output is already marked to be skipped.");
-        }
-        return false;
-    }
+    // SkipExisting is a preflight observation, not a permanent execution
+    // decision. Queue every validated output and recheck the filesystem in the
+    // worker so a file deleted while the job waits is exported normally.
 
     auto record = std::make_shared<JobRecord>();
     record->request = request;
@@ -332,14 +320,6 @@ bool ExportQueueController::resumeRecoveredJob(
             == ProductionExportCollisionPolicy::AskBeforeStart
         && !warnings.isEmpty() && !confirmExistingFiles) {
         if (collisionWarnings) *collisionWarnings = warnings;
-        return false;
-    }
-    const int executable = executableOutputCount(outputs);
-    if (executable < 1) {
-        if (errorMessage) {
-            *errorMessage = QStringLiteral(
-                "Every recovered output is currently marked to be skipped.");
-        }
         return false;
     }
     record->request.outputs = outputs;
