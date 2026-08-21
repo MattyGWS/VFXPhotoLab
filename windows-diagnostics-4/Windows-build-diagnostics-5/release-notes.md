@@ -1,0 +1,11 @@
+# 0.14.0m.2 — Layer Effect Owner-Selection UX Fix
+
+- Split presentation-row focus from owning-layer tool selection: Layer Effect and Live Filter rows resolve to hierarchy-safe owning roots for canvas/layer commands while remaining independently addressable sub-items in the Layers panel.
+- Move/Transform, transform overlays/prewarm/snapping, selected-pixel transforms, vector/path commands, mask operations, duplication/grouping/merging, Smart Layer source commands, Fit Canvas to Selected Layers and Export Selected SVG now operate on the owning layer when an fx/filter row is focused.
+- Preserved Layer Effect/Live Filter focus across whole-layer, selected-pixel and text-box transform commits so the Inspector stays on the edited effect/filter while its owner is moved or transformed.
+- Kept Delete and Move Up/Down semantics scoped to the selected effect/filter row rather than its owner.
+- Added the VFX Texture Lab-style automated Windows x64 release pipeline: one maintainer command can commit/push `main`, run the clean MSVC/Qt/wgpu-native/OpenColorIO build and tests on GitHub Actions, package portable and Inno Setup distributions, derive GitHub Release notes from this changelog, verify checksums/smoke reports, and publish the release.
+- Fixed the first MSVC release-build blocker (`C2026: string too big`) by embedding the 44.8 KiB authoritative adjustment WGSL as conservative 8 KiB literals and reconstructing it once at runtime, preserving the shader byte-for-byte while staying below MSVC's per-literal limit.
+- Fixed the second Windows release-build blocker in `VFXPhotoLabTests`: refreshed stale selection-edit signatures and clipboard/guide/layer field names, replaced non-existent Qt helpers (`QPainter::fillEllipse`, `QTransform::fromRotate`), and made 16-bit `QImage::fill` calls unambiguous under MSVC without changing the tested rendering semantics.
+- Fixed the third Windows release-build blockers: `VFXPhotoLabCanvasTests` now links the authoritative `vfxphotolab_core` instead of compiling a drifting partial copy of core sources, while explicitly including its UI-only AppStyle/Curves/widget implementations; the Windows application target also uses MSVC `/bigobj` so the integrated `MainWindow.cpp` translation unit can exceed the default COFF section count without changing generated code or ABI.
+- No persistence/schema changes.

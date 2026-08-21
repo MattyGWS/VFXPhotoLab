@@ -1,0 +1,10 @@
+{
+  "version": "0.14.0m.2",
+  "windows_version": "0.14.0.2",
+  "tag": "v0.14.0m.2",
+  "asset_stem": "VFXPhotoLab-0.14.0m.2-Windows-x64",
+  "portable_filename": "VFXPhotoLab-0.14.0m.2-Windows-x64-Portable.zip",
+  "installer_filename": "VFXPhotoLab-0.14.0m.2-Windows-x64-Setup.exe",
+  "checksum_filename": "VFXPhotoLab-0.14.0m.2-Windows-x64-SHA256.txt",
+  "artifact_name": "VFXPhotoLab-0.14.0m.2-Windows-x64"
+}

@@ -115,3 +115,8 @@ For an exact release-package diagnosis, follow the configure/install commands in
 ## Signing
 
 The current Windows installer and executable are unsigned. Microsoft Defender SmartScreen may therefore warn until the project has an established signing reputation. Code signing can be added later without changing the release command or package layout.
+
+
+## Windows CI test diagnostics
+
+Windows test runners are deliberately console-subsystem executables even though the shipped application is a GUI-subsystem executable. This preserves QtTest assertion output in GitHub Actions. The release workflow also writes `build/windows-release/ctest-results.xml` and includes it, together with `LastTest.log`, in the always-uploaded `Windows-build-diagnostics-*` artifact.

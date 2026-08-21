@@ -37,4 +37,4 @@ Thumbs.db
 /release/
 /VFXPhotoLab-*-Windows-x64/
 /Windows-build-diagnostics-*/
-/windows-build-failure.*
+/windows-build-failure-*

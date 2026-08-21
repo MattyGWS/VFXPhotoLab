@@ -118,7 +118,13 @@ jobs:
 
       - name: Run core tests
         shell: pwsh
-        run: ctest --test-dir build/windows-release --output-on-failure -C Release
+        run: |
+          $testDir = (Resolve-Path "build/windows-release").Path
+          $junit = Join-Path $testDir "ctest-results.xml"
+          ctest --test-dir $testDir `
+            --output-on-failure `
+            --output-junit $junit `
+            -C Release
 
       - name: Install portable tree and deploy Qt
         shell: pwsh
@@ -250,6 +256,7 @@ jobs:
             build/portable-smoke.json
             build/installed-smoke.json
             build/windows-release/Testing/Temporary/LastTest.log
+            build/windows-release/ctest-results.xml
           if-no-files-found: ignore
           retention-days: 14
 

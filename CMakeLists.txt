@@ -647,6 +647,35 @@ if(BUILD_TESTING)
     add_test(NAME VFXPhotoLabCanvasTests COMMAND VFXPhotoLabCanvasTests)
     set_tests_properties(VFXPhotoLabCanvasTests PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    # qt_add_executable() intentionally creates normal GUI-subsystem applications
+    # on Windows.  That is correct for VFXPhotoLab itself, but it suppresses the
+    # stdout/stderr stream QtTest uses for assertion diagnostics.  Keep every
+    # test runner as a console-subsystem executable so CTest and GitHub Actions
+    # can report the exact failing test function rather than only a non-zero
+    # process result.  This changes test-process presentation only, never the
+    # application binary or production code paths under test.
+    if(WIN32)
+        set(VFXPHOTOLAB_TEST_TARGETS
+            VFXPhotoLabTests
+            VFXPhotoLabColourManagementTests
+            VFXPhotoLabLutConformanceTests
+            VFXPhotoLabSpatialFilterTests
+            VFXPhotoLabColourAdjustmentEssentialsTests
+            VFXPhotoLabAdvancedColourControlsTests
+            VFXPhotoLabOpticalSpatialColourEffectsTests
+            VFXPhotoLabAdditionalSpatialFiltersTests
+            VFXPhotoLabPresetTests
+            VFXPhotoLabExportProfileTests
+            VFXPhotoLabProductionExportTests
+            VFXPhotoLabExportQueueTests
+            VFXPhotoLabSvgTests
+            VFXPhotoLabTextTests
+            VFXPhotoLabCanvasTests)
+        foreach(test_target IN LISTS VFXPHOTOLAB_TEST_TARGETS)
+            set_target_properties(${test_target} PROPERTIES WIN32_EXECUTABLE FALSE)
+        endforeach()
+    endif()
 endif()
 
 if(UNIX AND NOT APPLE)
