@@ -556,9 +556,9 @@ bool buildExactColourCarrier(const QImage &straight,
             return false;
         }
         visibleXs.clear();
-        const uchar *semanticRow = semantic.constScanLine(sy);
+        const uchar *coverageRow = coverage.constScanLine(sy);
         for (int sx = 0; sx < sourceWidth; ++sx) {
-            if (semanticRow[sx * 4 + 3] > 0) visibleXs.push_back(sx);
+            if (coverageRow[sx * 4 + 3] > 0) visibleXs.push_back(sx);
         }
         anyVisible = anyVisible || !visibleXs.isEmpty();
         qsizetype rightIndex = 0;
@@ -778,12 +778,17 @@ QImage featherSemanticCoverage(const LayerNode &layer,
         // throwing away 16-bit edge detail merely to make the two outputs agree.
         const QImage::Format canonicalFormat = QImage::Format_RGBA64;
         const qint64 pixelBytes = sixteenBit ? 8 : 4;
+        const long double exactEightBitCarrierBytes = sixteenBit ? 0.0L
+            : static_cast<long double>(sourcePixels) * 8.0L
+                + static_cast<long double>(horizontalCount) * sizeof(int)
+                + static_cast<long double>(outputPixels) * 4.0L;
         const long double estimatedWorkingBytes =
             static_cast<long double>(sourcePixels) * 16.0L
             + static_cast<long double>(horizontalCount)
                 * (sizeof(double) + sizeof(int))
             + static_cast<long double>(outputPixels)
                 * (sizeof(double) + pixelBytes * 2)
+            + exactEightBitCarrierBytes
             + static_cast<long double>(sourceWidth + sourceHeight) * 40.0L;
         if (estimatedWorkingBytes > MaximumFeatherWorkingBytes) {
             // Full-document callers are allowed, but the CPU reference remains
@@ -847,6 +852,31 @@ QImage featherSemanticCoverage(const LayerNode &layer,
         const QImage straight = semantic.convertToFormat(canonicalFormat);
         const QImage coverageStraight = silhouette.convertToFormat(canonicalFormat);
         if (straight.isNull() || coverageStraight.isNull()) return {};
+
+        // RGBA8 Feather must retain the exact authored colour carrier produced by
+        // the ordinary zero-Feather RGBA8 raster path. Coverage/style-alpha math
+        // stays canonical RGBA64 so 8/16-bit Feather shares one high-precision
+        // silhouette, while RGB is never shifted by a cross-depth round trip.
+        // The native GPU preparation uses this same carrier routine and therefore
+        // consumes byte-identical authored RGB for its tile contract.
+        QImage exactEightBitCarrier;
+        if (!sixteenBit) {
+            const QImage semantic8 = renderSemanticRegion(
+                layer, layerFingerprint, previewSize, sourceRect, documentSize,
+                worldTransform, QImage::Format_RGBA8888, colourSpace,
+                forceOpaquePixelAlpha, grayscaleDocument, false, cancelRequested);
+            const QImage silhouette8 = renderSemanticRegion(
+                layer, layerFingerprint, previewSize, sourceRect, documentSize,
+                worldTransform, QImage::Format_RGBA8888, colourSpace,
+                forceOpaquePixelAlpha, grayscaleDocument, true, cancelRequested);
+            if (semantic8.isNull() || silhouette8.isNull()
+                || !buildExactColourCarrier(semantic8, silhouette8, sourceRect,
+                                            previewRegion, kernelX.support,
+                                            kernelY.support, &exactEightBitCarrier,
+                                            cancelRequested)) {
+                return {};
+            }
+        }
 
         QVector<double> horizontal(static_cast<qsizetype>(horizontalCount));
         QVector<int> nearestX(static_cast<qsizetype>(horizontalCount), -1);
@@ -1043,9 +1073,21 @@ QImage featherSemanticCoverage(const LayerNode &layer,
                                            sourcePixel.blue(), alpha);
                 } else {
                     uchar *target = output.scanLine(oy) + ox * 4;
-                    target[0] = static_cast<uchar>(std::lround(sourcePixel.red() / 257.0));
-                    target[1] = static_cast<uchar>(std::lround(sourcePixel.green() / 257.0));
-                    target[2] = static_cast<uchar>(std::lround(sourcePixel.blue() / 257.0));
+                    const uchar *carrierPixel = exactEightBitCarrier.constScanLine(oy)
+                        + ox * 4;
+                    if (carrierPixel[3] > 0) {
+                        target[0] = carrierPixel[0];
+                        target[1] = carrierPixel[1];
+                        target[2] = carrierPixel[2];
+                    } else {
+                        // Canonical 16-bit antialiasing can retain sub-code-value
+                        // coverage that legitimately disappears in RGBA8. Preserve
+                        // straight RGB under that tiny alpha rather than replacing
+                        // it with transparent black.
+                        target[0] = static_cast<uchar>(std::lround(sourcePixel.red() / 257.0));
+                        target[1] = static_cast<uchar>(std::lround(sourcePixel.green() / 257.0));
+                        target[2] = static_cast<uchar>(std::lround(sourcePixel.blue() / 257.0));
+                    }
                     target[3] = static_cast<uchar>(std::lround(
                         std::clamp(outputAlpha[outputIndex] * styleAlpha, 0.0, 1.0)
                         * 255.0));

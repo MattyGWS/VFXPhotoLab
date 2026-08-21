@@ -2669,11 +2669,25 @@ VectorShape VectorShape::fromJson(const QJsonObject &object, bool *ok)
                                  &boundsOk);
     bool lineStartOk = true;
     bool lineEndOk = true;
+    const QJsonValue lineStartValue = object.value(QStringLiteral("lineStart"));
+    const QJsonValue lineEndValue = object.value(QStringLiteral("lineEnd"));
     if (result.type == VectorShapeType::Line) {
-        result.lineStart = pointFromJson(object.value(QStringLiteral("lineStart")).toObject(),
-                                         &lineStartOk);
-        result.lineEnd = pointFromJson(object.value(QStringLiteral("lineEnd")).toObject(),
-                                       &lineEndOk);
+        result.lineStart = pointFromJson(lineStartValue.toObject(), &lineStartOk);
+        result.lineEnd = pointFromJson(lineEndValue.toObject(), &lineEndOk);
+    } else if (!lineStartValue.isUndefined() || !lineEndValue.isUndefined()) {
+        // The serializer has historically carried these dormant primitive fields
+        // for every shape kind, and they participate in VectorShape equality and
+        // cache fingerprints. Preserve them when present so a save/load or a
+        // primitive-to-path conversion cannot silently acquire the constructor
+        // defaults on Windows or any other platform. Older payloads that omit
+        // both fields remain compatible because non-Line rendering never consumes
+        // them. A half-present pair is malformed rather than ambiguous.
+        lineStartOk = lineStartValue.isObject() && lineEndValue.isObject();
+        lineEndOk = lineStartOk;
+        if (lineStartOk) {
+            result.lineStart = pointFromJson(lineStartValue.toObject(), &lineStartOk);
+            result.lineEnd = pointFromJson(lineEndValue.toObject(), &lineEndOk);
+        }
     }
     result.polygonSides = object.value(QStringLiteral("polygonSides")).toInt(5);
     result.starInnerRatio = object.value(QStringLiteral("starInnerRatio")).toDouble(0.5);

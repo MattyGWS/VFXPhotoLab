@@ -99,6 +99,62 @@ bool transformsClose(const QTransform &left, const QTransform &right, const doub
         && std::abs(left.m33() - right.m33()) <= epsilon;
 }
 
+QByteArray snapshotEnvelopeForPreIdentityVersion(const QByteArray &currentEnvelope,
+                                                const quint32 targetVersion)
+{
+    // Snapshot v28 inserted the persistent document identity immediately after
+    // the three leading UTF-8 strings. Tests that deliberately claim an older
+    // envelope must remove that field as well as changing the version, otherwise
+    // the legacy reader is merely desynchronised before it reaches the feature
+    // gate the fixture is intended to exercise.
+    if (targetVersion >= 28 || currentEnvelope.size() <= 12) return {};
+
+    QBuffer buffer;
+    buffer.setData(currentEnvelope);
+    if (!buffer.open(QIODevice::ReadOnly)) return {};
+    QDataStream stream(&buffer);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream.setVersion(QDataStream::Qt_6_0);
+
+    char magic[8] = {};
+    if (stream.readRawData(magic, sizeof(magic)) != static_cast<int>(sizeof(magic))) {
+        return {};
+    }
+    quint32 sourceVersion = 0;
+    stream >> sourceVersion;
+    if (stream.status() != QDataStream::Ok || sourceVersion != 28) return {};
+
+    for (int index = 0; index < 3; ++index) {
+        quint32 byteCount = 0;
+        stream >> byteCount;
+        if (stream.status() != QDataStream::Ok
+            || byteCount > static_cast<quint64>(std::numeric_limits<int>::max())
+            || byteCount > static_cast<quint64>(buffer.bytesAvailable())
+            || (byteCount > 0
+                && stream.skipRawData(static_cast<int>(byteCount))
+                    != static_cast<int>(byteCount))) {
+            return {};
+        }
+    }
+
+    const qint64 identityOffset = buffer.pos();
+    QUuid identity;
+    stream >> identity;
+    const qint64 afterIdentity = buffer.pos();
+    if (stream.status() != QDataStream::Ok || identity.isNull()
+        || identityOffset < 12 || afterIdentity <= identityOffset) {
+        return {};
+    }
+
+    QByteArray legacy = currentEnvelope;
+    legacy.remove(identityOffset, afterIdentity - identityOffset);
+    legacy[8] = char(targetVersion & 0xffu);
+    legacy[9] = char((targetVersion >> 8) & 0xffu);
+    legacy[10] = char((targetVersion >> 16) & 0xffu);
+    legacy[11] = char((targetVersion >> 24) & 0xffu);
+    return legacy;
+}
+
 bool exactImagesEqual(const QImage &left, const QImage &right)
 {
     if (left.isNull() || right.isNull()) {
@@ -4858,13 +4914,11 @@ void CoreTests::embeddedSmartSourceSurvivesSessionSnapshot()
 
     QFile snapshotFile(snapshotPath);
     QVERIFY(snapshotFile.open(QIODevice::ReadOnly));
-    QByteArray legacyEnvelope = snapshotFile.readAll();
+    const QByteArray currentEnvelope = snapshotFile.readAll();
     snapshotFile.close();
-    QVERIFY(legacyEnvelope.size() > 12);
-    legacyEnvelope[8] = char(18);
-    legacyEnvelope[9] = char(0);
-    legacyEnvelope[10] = char(0);
-    legacyEnvelope[11] = char(0);
+    const QByteArray legacyEnvelope = snapshotEnvelopeForPreIdentityVersion(
+        currentEnvelope, 18);
+    QVERIFY(!legacyEnvelope.isEmpty());
     const QString dishonestPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-embedded-smart-session.bin"));
     QFile dishonestFile(dishonestPath);
@@ -4877,8 +4931,9 @@ void CoreTests::embeddedSmartSourceSurvivesSessionSnapshot()
     QVERIFY(!store.restoreSnapshot(dishonestPath, &rejected, &rejectedError));
     QVERIFY(!rejectedError.isEmpty());
 
-    QByteArray prePrecisionEnvelope = legacyEnvelope;
-    prePrecisionEnvelope[8] = char(19);
+    const QByteArray prePrecisionEnvelope = snapshotEnvelopeForPreIdentityVersion(
+        currentEnvelope, 19);
+    QVERIFY(!prePrecisionEnvelope.isEmpty());
     const QString dishonestPrecisionPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-precision-smart-session.bin"));
     QFile dishonestPrecisionFile(dishonestPrecisionPath);
@@ -5474,18 +5529,17 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     QCOMPARE(snapshotFormatVersion, 28u);
     snapshotFile.close();
 
-    // Snapshot 23 predates Layer Effect stack fields. Changing only the
-    // envelope version must reject the newer binary layout rather than shifting
-    // subsequent layer fields and silently losing the fx definition.
+    // Snapshot 23 predates Layer Effect stack fields. Downgrading the v28
+    // outer envelope to the pre-identity layout must reject the newer layer
+    // payload rather than shifting subsequent fields and silently losing the
+    // fx definition.
     QFile preLayerEffectBytesFile(snapshotPath);
     QVERIFY(preLayerEffectBytesFile.open(QIODevice::ReadOnly));
-    QByteArray preLayerEffectEnvelope = preLayerEffectBytesFile.readAll();
+    const QByteArray currentSessionEnvelope = preLayerEffectBytesFile.readAll();
     preLayerEffectBytesFile.close();
-    QVERIFY(preLayerEffectEnvelope.size() > 12);
-    preLayerEffectEnvelope[8] = char(23);
-    preLayerEffectEnvelope[9] = char(0);
-    preLayerEffectEnvelope[10] = char(0);
-    preLayerEffectEnvelope[11] = char(0);
+    const QByteArray preLayerEffectEnvelope = snapshotEnvelopeForPreIdentityVersion(
+        currentSessionEnvelope, 23);
+    QVERIFY(!preLayerEffectEnvelope.isEmpty());
     const QString dishonestPreLayerEffectPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-layer-effect-session.bin"));
     QFile dishonestPreLayerEffect(dishonestPreLayerEffectPath);
@@ -5503,8 +5557,9 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     // Snapshot 24 had Layer Effect definitions but not schema-2 renderer
     // parameters. Because its binary layout is otherwise compatible, this
     // specifically exercises the authored-parameter envelope gate.
-    QByteArray preShadowGlowParametersEnvelope = preLayerEffectEnvelope;
-    preShadowGlowParametersEnvelope[8] = char(24);
+    const QByteArray preShadowGlowParametersEnvelope =
+        snapshotEnvelopeForPreIdentityVersion(currentSessionEnvelope, 24);
+    QVERIFY(!preShadowGlowParametersEnvelope.isEmpty());
     const QString dishonestPreShadowGlowParametersPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-shadow-glow-parameters-session.bin"));
     QFile dishonestPreShadowGlowParameters(dishonestPreShadowGlowParametersPath);
@@ -5523,8 +5578,9 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     // schema-3 Stroke/Overlay fields introduced by 0.14.0j. Downgrading only
     // the envelope must reject the newer authored state rather than silently
     // accepting it as a 0.14.0i snapshot.
-    QByteArray preStrokeOverlayParametersEnvelope = preLayerEffectEnvelope;
-    preStrokeOverlayParametersEnvelope[8] = char(25);
+    const QByteArray preStrokeOverlayParametersEnvelope =
+        snapshotEnvelopeForPreIdentityVersion(currentSessionEnvelope, 25);
+    QVERIFY(!preStrokeOverlayParametersEnvelope.isEmpty());
     const QString dishonestPreStrokeOverlayParametersPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-stroke-overlay-parameters-session.bin"));
     QFile dishonestPreStrokeOverlayParameters(dishonestPreStrokeOverlayParametersPath);
@@ -5544,8 +5600,9 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
 
     // Snapshot 26 predates Layer Effect schema-4 Bevel & Emboss lighting
     // parameters. Downgrading only the envelope must reject current fx state.
-    QByteArray preBevelParametersEnvelope = preLayerEffectEnvelope;
-    preBevelParametersEnvelope[8] = char(26);
+    const QByteArray preBevelParametersEnvelope =
+        snapshotEnvelopeForPreIdentityVersion(currentSessionEnvelope, 26);
+    QVERIFY(!preBevelParametersEnvelope.isEmpty());
     const QString dishonestPreBevelParametersPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-bevel-parameters-session.bin"));
     QFile dishonestPreBevelParameters(dishonestPreBevelParametersPath);
@@ -5561,18 +5618,12 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     QVERIFY(preBevelParametersError.contains(
         QStringLiteral("Bevel"), Qt::CaseInsensitive));
 
-    // Snapshot 22 knew Live Filters but not their schema-2 masks. Changing
-    // only the envelope version must therefore be rejected rather than
+    // Snapshot 22 knew Live Filters but not their schema-2 masks. Downgrading
+    // the v28 outer envelope must therefore be rejected rather than
     // silently discarding or misreading the new mask payload.
-    QFile preFilterMaskBytesFile(snapshotPath);
-    QVERIFY(preFilterMaskBytesFile.open(QIODevice::ReadOnly));
-    QByteArray preFilterMaskEnvelope = preFilterMaskBytesFile.readAll();
-    preFilterMaskBytesFile.close();
-    QVERIFY(preFilterMaskEnvelope.size() > 12);
-    preFilterMaskEnvelope[8] = char(22);
-    preFilterMaskEnvelope[9] = char(0);
-    preFilterMaskEnvelope[10] = char(0);
-    preFilterMaskEnvelope[11] = char(0);
+    const QByteArray preFilterMaskEnvelope = snapshotEnvelopeForPreIdentityVersion(
+        currentSessionEnvelope, 22);
+    QVERIFY(!preFilterMaskEnvelope.isEmpty());
     const QString dishonestPreFilterMaskPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-live-filter-mask-session.bin"));
     QFile dishonestPreFilterMask(dishonestPreFilterMaskPath);
@@ -5591,15 +5642,9 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     // retain the new per-Smart-instance filter payload. The shifted binary
     // layout must be rejected rather than silently reinterpreted as older
     // layer fields.
-    QFile preLiveFilterBytesFile(snapshotPath);
-    QVERIFY(preLiveFilterBytesFile.open(QIODevice::ReadOnly));
-    QByteArray preLiveFilterEnvelope = preLiveFilterBytesFile.readAll();
-    preLiveFilterBytesFile.close();
-    QVERIFY(preLiveFilterEnvelope.size() > 12);
-    preLiveFilterEnvelope[8] = char(21);
-    preLiveFilterEnvelope[9] = char(0);
-    preLiveFilterEnvelope[10] = char(0);
-    preLiveFilterEnvelope[11] = char(0);
+    const QByteArray preLiveFilterEnvelope = snapshotEnvelopeForPreIdentityVersion(
+        currentSessionEnvelope, 21);
+    QVERIFY(!preLiveFilterEnvelope.isEmpty());
     const QString dishonestPreLiveFilterPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-live-filter-session.bin"));
     QFile dishonestPreLiveFilter(dishonestPreLiveFilterPath);
@@ -5614,15 +5659,9 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
                                    &preLiveFilterError));
     QVERIFY(!preLiveFilterError.isEmpty());
 
-    QFile preSmartTransformBytesFile(snapshotPath);
-    QVERIFY(preSmartTransformBytesFile.open(QIODevice::ReadOnly));
-    QByteArray preSmartTransformEnvelope = preSmartTransformBytesFile.readAll();
-    preSmartTransformBytesFile.close();
-    QVERIFY(preSmartTransformEnvelope.size() > 12);
-    preSmartTransformEnvelope[8] = char(20);
-    preSmartTransformEnvelope[9] = char(0);
-    preSmartTransformEnvelope[10] = char(0);
-    preSmartTransformEnvelope[11] = char(0);
+    const QByteArray preSmartTransformEnvelope = snapshotEnvelopeForPreIdentityVersion(
+        currentSessionEnvelope, 20);
+    QVERIFY(!preSmartTransformEnvelope.isEmpty());
     const QString dishonestPreSmartTransformPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-smart-transform-session.bin"));
     QFile dishonestPreSmartTransform(dishonestPreSmartTransformPath);
@@ -5640,15 +5679,9 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     // A snapshot that claims the pre-Feather residency envelope must not be
     // allowed to smuggle in non-zero schema-8 Feather state. This protects
     // Hot/Warm/Cold migration from silently changing project semantics.
-    QFile snapshotBytesFile(snapshotPath);
-    QVERIFY(snapshotBytesFile.open(QIODevice::ReadOnly));
-    QByteArray legacyEnvelope = snapshotBytesFile.readAll();
-    snapshotBytesFile.close();
-    QVERIFY(legacyEnvelope.size() > 12);
-    legacyEnvelope[8] = char(16);
-    legacyEnvelope[9] = char(0);
-    legacyEnvelope[10] = char(0);
-    legacyEnvelope[11] = char(0);
+    const QByteArray legacyEnvelope = snapshotEnvelopeForPreIdentityVersion(
+        currentSessionEnvelope, 16);
+    QVERIFY(!legacyEnvelope.isEmpty());
     const QString dishonestLegacyPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-feather-session.bin"));
     QFile dishonestLegacy(dishonestLegacyPath);
@@ -11433,9 +11466,14 @@ void CoreTests::nativeGpuLiveFilterStackMatchesCpuWhenAvailable()
         document.sourceImage().size(), nullptr,
         document.colourState().processingCompatibility);
     TiledCanvasEngine::RenderInfo info;
+    const RenderSessionContext renderContext {
+        QUuid::createUuid(), 1, 1,
+        document.colourState().processingCompatibility};
+    backend.activateSession(renderContext);
     const QImage actual = backend.renderRegion(
-        document.sourceImage(), document.layers(), region,
+        renderContext, document.sourceImage(), document.layers(), region,
         document.sourceImage().size(), 0, nullptr, &info);
+    backend.releaseSession(renderContext.documentSessionId);
     QVERIFY(!expected.isNull());
     QVERIFY(!actual.isNull());
     QVERIFY2(!info.usedGpu && info.usedCpu, qPrintable(backend.statusText()));
@@ -16353,16 +16391,10 @@ void CoreTests::vectorShapeLayerRoundTripsVersionSevenAndRejectsPreVersionSeven(
     QVERIFY2(restored.loadProject(path, &error), qPrintable(error));
     const LayerNode actual = restored.layerById(vectorId);
     QCOMPARE(actual.type, LayerType::Vector);
-    bool expectedVectorOk = false;
-    bool actualVectorOk = false;
-    const QJsonObject expectedVectorJson = expected.vectorData.toJson(&expectedVectorOk);
-    const QJsonObject actualVectorJson = actual.vectorData.toJson(&actualVectorOk);
-    QVERIFY(expectedVectorOk);
-    QVERIFY(actualVectorOk);
-    // Persistence equality is the canonical serialised vector state. The
-    // in-memory structs also carry dormant primitive/path implementation fields
-    // that are intentionally not persisted for unrelated shape kinds.
-    QCOMPARE(actualVectorJson, expectedVectorJson);
+    // Every field that participates in VectorShape equality/cache identity must
+    // survive persistence, including the historically serialised dormant line
+    // endpoints on non-Line primitives and converted paths.
+    QCOMPARE(actual.vectorData, expected.vectorData);
     QCOMPARE(actual.opacity, expected.opacity);
     QCOMPARE(actual.blendMode, expected.blendMode);
     QVERIFY(transformsClose(actual.transform, expected.transform));
@@ -19404,6 +19436,37 @@ void CoreTests::expandedVectorStrokesPreserveVisibleGeometryAndRoundTrip()
     projectFile.close();
     QJsonObject downgradedRoot = downgradedDocument.object();
     downgradedRoot.insert(QStringLiteral("version"), 12);
+    QJsonArray downgradedLayers = downgradedRoot.value(
+        QStringLiteral("layerTree")).toArray();
+    bool forcedNonZeroPath = false;
+    for (qsizetype layerIndex = 0; layerIndex < downgradedLayers.size(); ++layerIndex) {
+        QJsonObject layerObject = downgradedLayers.at(layerIndex).toObject();
+        if (layerObject.value(QStringLiteral("kind")).toString()
+            != QStringLiteral("vector")) {
+            continue;
+        }
+        QJsonObject vectorObject = layerObject.value(QStringLiteral("vector")).toObject();
+        QJsonArray objects = vectorObject.value(QStringLiteral("objects")).toArray();
+        for (qsizetype objectIndex = 0; objectIndex < objects.size(); ++objectIndex) {
+            QJsonObject object = objects.at(objectIndex).toObject();
+            if (object.value(QStringLiteral("kind")).toString()
+                != QStringLiteral("path")) {
+                continue;
+            }
+            object.insert(QStringLiteral("fillRule"), QStringLiteral("nonzero"));
+            objects.replace(objectIndex, object);
+            forcedNonZeroPath = true;
+            break;
+        }
+        if (forcedNonZeroPath) {
+            vectorObject.insert(QStringLiteral("objects"), objects);
+            layerObject.insert(QStringLiteral("vector"), vectorObject);
+            downgradedLayers.replace(layerIndex, layerObject);
+            break;
+        }
+    }
+    QVERIFY(forcedNonZeroPath);
+    downgradedRoot.insert(QStringLiteral("layerTree"), downgradedLayers);
     const QString downgradedPath = directory.filePath(
         QStringLiteral("expanded-stroke-pre-winding.vfxphoto"));
     QFile downgradedFile(downgradedPath);
