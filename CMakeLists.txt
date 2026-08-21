@@ -456,7 +456,13 @@ endif()
 
 if(MSVC)
     target_compile_options(vfxphotolab_core PRIVATE /W4 /permissive-)
-    target_compile_options(VFXPhotoLab PRIVATE /W4 /permissive-)
+    # MainWindow.cpp is intentionally large: it owns the integrated editor UI
+    # wiring for tools, Smart Layers, Live Filters, fx, colour management and
+    # export. MSVC's default COFF object section limit is lower than GCC/Clang's
+    # equivalent output and is exceeded by this translation unit in Release.
+    # /bigobj changes only the object-file container; it does not alter runtime
+    # code generation or ABI.
+    target_compile_options(VFXPhotoLab PRIVATE /W4 /permissive- /bigobj)
 else()
     target_compile_options(vfxphotolab_core PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(VFXPhotoLab PRIVATE -Wall -Wextra -Wpedantic)
@@ -613,25 +619,30 @@ if(BUILD_TESTING)
 
     qt_add_executable(VFXPhotoLabCanvasTests
         tests/test_canvas.cpp
+        # Canvas/widget tests exercise the same core rendering/document model as
+        # the application. Keep only UI-only implementation files here and link
+        # the authoritative core library below; compiling copies of Adjustment,
+        # TransformSafety, ShortcutUtils, etc. made this target drift as those
+        # implementations gained Vector/Text/Smart/GPU dependencies.
+        src/AppStyle.cpp
+        src/AppStyle.h
         src/DocumentStripWidget.cpp
         src/DocumentStripWidget.h
         src/ImageCanvas.cpp
         src/ImageCanvas.h
         src/LayerTreeWidget.cpp
         src/LayerTreeWidget.h
+        src/CurvesEditorWidget.cpp
+        src/CurvesEditorWidget.h
         src/GradientMapEditorWidget.cpp
         src/GradientMapEditorWidget.h
         src/SliderSpinBox.cpp
         src/SliderSpinBox.h
-        src/Adjustment.cpp
-        src/Adjustment.h
-        src/TransformSafety.cpp
-        src/TransformSafety.h
-        src/ShortcutUtils.cpp
-        src/ShortcutUtils.h
         src/ToolBarActionLifecycle.h
     )
-    target_link_libraries(VFXPhotoLabCanvasTests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+    target_link_libraries(VFXPhotoLabCanvasTests PRIVATE
+        vfxphotolab_core
+        Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
     target_include_directories(VFXPhotoLabCanvasTests PRIVATE src)
     add_test(NAME VFXPhotoLabCanvasTests COMMAND VFXPhotoLabCanvasTests)
     set_tests_properties(VFXPhotoLabCanvasTests PROPERTIES
