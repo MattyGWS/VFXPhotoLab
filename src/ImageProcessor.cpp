@@ -1900,6 +1900,9 @@ QImage applyAdjustmentToImage(const QImage &input,
     if (input.isNull()) {
         return {};
     }
+    if (cancelRequested && cancelRequested->load(std::memory_order_acquire)) {
+        return {};
+    }
 
     AdjustmentData adjustment = layer.effectiveAdjustmentData();
     // Preserve exact component values and hidden RGB for semantic no-op
@@ -5221,6 +5224,9 @@ QImage ImageProcessor::renderRegionPreservingHiddenRgb(
     const ColourProcessingCompatibility processingCompatibility)
 {
     if (source.isNull()) {
+        return {};
+    }
+    if (cancelRequested && cancelRequested->load(std::memory_order_acquire)) {
         return {};
     }
     const QRect requestedRegion = previewRegion.intersected(source.rect());

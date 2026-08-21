@@ -74,7 +74,8 @@ public:
                         const QUuid &documentSessionId = QUuid(),
                         quint64 colourStateRevision = 0,
                         ColourProcessingCompatibility processingCompatibility =
-                            ColourProcessingCompatibility::LegacyV1);
+                            ColourProcessingCompatibility::LegacyV1,
+                        bool forceExactCpuReference = false);
 
     // Low-latency interactive path. The complete requested region is encoded in
     // one GPU command submission and read back once, avoiding a serial submit/map

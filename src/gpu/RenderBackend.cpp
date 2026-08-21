@@ -488,7 +488,8 @@ QImage RenderBackend::renderRegion(const RenderSessionContext &sessionContext,
                                       renderInfo,
                                       sessionContext.documentSessionId,
                                       sessionContext.colourStateRevision,
-                                      sessionContext.processingCompatibility);
+                                      sessionContext.processingCompatibility,
+                                      containsAdjustmentCoverageWithoutParityApproval(layers));
 }
 
 QImage RenderBackend::renderRegion(const QImage &source,
@@ -524,7 +525,8 @@ QImage RenderBackend::renderRegion(const QImage &source,
                                       renderInfo,
                                       QUuid(),
                                       0,
-                                      ColourProcessingCompatibility::LegacyV1);
+                                      ColourProcessingCompatibility::LegacyV1,
+                                      containsAdjustmentCoverageWithoutParityApproval(layers));
 }
 
 QImage RenderBackend::renderInteractiveRegion(

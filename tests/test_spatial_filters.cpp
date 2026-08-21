@@ -533,6 +533,21 @@ void SpatialFilterTests::blurSharpenEssentialsPreserveAlphaAndMatchTiledRenderin
     base.rasterImage = source;
     base.rasterReferenceSize = size;
 
+    // Hidden RGB must be processed independently of coverage when these
+    // spatial operators are configured not to affect alpha. Build an otherwise
+    // identical opaque reference so the test checks that contract directly
+    // instead of assuming every filtered transparent sample remains non-black.
+    QImage opaqueSource = source;
+    opaqueSource.detach();
+    for (int y = 0; y < opaqueSource.height(); ++y) {
+        uchar *row = opaqueSource.scanLine(y);
+        for (int x = 0; x < opaqueSource.width(); ++x) {
+            row[x * 4 + 3] = 255;
+        }
+    }
+    LayerNode opaqueBase = base;
+    opaqueBase.rasterImage = opaqueSource;
+
     const QVector<AdjustmentType> types {
         AdjustmentType::GaussianBlur,
         AdjustmentType::BoxBlur,
@@ -607,14 +622,21 @@ void SpatialFilterTests::blurSharpenEssentialsPreserveAlphaAndMatchTiledRenderin
                  qPrintable(QStringLiteral("Tiled mismatch for %1")
                                 .arg(adjustmentTypeToString(type))));
 
+        const QImage opaqueFull = ImageProcessor::renderRegionPreservingHiddenRgb(
+            opaqueSource, {adjustment, opaqueBase}, opaqueSource.rect(), size);
+        QVERIFY2(!opaqueFull.isNull(), qPrintable(adjustmentTypeToString(type)));
+        QCOMPARE(opaqueFull.size(), size);
+
         for (int y = 0; y < size.height(); y += 23) {
             const uchar *before = source.constScanLine(y);
             const uchar *after = full.constScanLine(y);
+            const uchar *opaqueAfter = opaqueFull.constScanLine(y);
             for (int x = 0; x < size.width(); x += 29) {
                 QCOMPARE(after[x * 4 + 3], before[x * 4 + 3]);
                 if (before[x * 4 + 3] == 0) {
-                    QVERIFY(after[x * 4] != 0 || after[x * 4 + 1] != 0
-                            || after[x * 4 + 2] != 0);
+                    QCOMPARE(after[x * 4], opaqueAfter[x * 4]);
+                    QCOMPARE(after[x * 4 + 1], opaqueAfter[x * 4 + 1]);
+                    QCOMPARE(after[x * 4 + 2], opaqueAfter[x * 4 + 2]);
                 }
             }
         }

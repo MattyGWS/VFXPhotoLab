@@ -771,9 +771,15 @@ QImage featherSemanticCoverage(const LayerNode &layer,
         const bool sixteenBit = formatProbe.depth() > 32;
         const QImage::Format straightFormat = sixteenBit
             ? QImage::Format_RGBA64 : QImage::Format_RGBA8888;
+        // Feather coverage and style-alpha extraction deliberately use one
+        // canonical high-precision RGBA64 rasterisation at both document bit
+        // depths. Qt's 8- and 16-bit antialiasers can otherwise disagree at a
+        // few edge samples. Keeping the source coverage high precision avoids
+        // throwing away 16-bit edge detail merely to make the two outputs agree.
+        const QImage::Format canonicalFormat = QImage::Format_RGBA64;
         const qint64 pixelBytes = sixteenBit ? 8 : 4;
         const long double estimatedWorkingBytes =
-            static_cast<long double>(sourcePixels) * pixelBytes * 2.0L
+            static_cast<long double>(sourcePixels) * 16.0L
             + static_cast<long double>(horizontalCount)
                 * (sizeof(double) + sizeof(int))
             + static_cast<long double>(outputPixels)
@@ -830,16 +836,16 @@ QImage featherSemanticCoverage(const LayerNode &layer,
 
         const QImage semantic = renderSemanticRegion(
             layer, layerFingerprint, previewSize, sourceRect, documentSize,
-            worldTransform, straightFormat, colourSpace, forceOpaquePixelAlpha,
+            worldTransform, canonicalFormat, colourSpace, forceOpaquePixelAlpha,
             grayscaleDocument, false, cancelRequested);
         if (semantic.isNull()) return {};
         const QImage silhouette = renderSemanticRegion(
             layer, layerFingerprint, previewSize, sourceRect, documentSize,
-            worldTransform, straightFormat, colourSpace, forceOpaquePixelAlpha,
+            worldTransform, canonicalFormat, colourSpace, forceOpaquePixelAlpha,
             grayscaleDocument, true, cancelRequested);
         if (silhouette.isNull()) return {};
-        const QImage straight = semantic.convertToFormat(straightFormat);
-        const QImage coverageStraight = silhouette.convertToFormat(straightFormat);
+        const QImage straight = semantic.convertToFormat(canonicalFormat);
+        const QImage coverageStraight = silhouette.convertToFormat(canonicalFormat);
         if (straight.isNull() || coverageStraight.isNull()) return {};
 
         QVector<double> horizontal(static_cast<qsizetype>(horizontalCount));
@@ -1019,16 +1025,16 @@ QImage featherSemanticCoverage(const LayerNode &layer,
 
                 const qsizetype outputIndex =
                     static_cast<qsizetype>(oy) * outputWidth + ox;
+                const QRgba64 sourcePixel = reinterpret_cast<const QRgba64 *>(
+                    straight.constScanLine(sy))[sx];
+                const QRgba64 coveragePixel = reinterpret_cast<const QRgba64 *>(
+                    coverageStraight.constScanLine(sy))[sx];
+                const double sourceCoverage = coveragePixel.alpha() / 65535.0;
+                const double styleAlpha = sourceCoverage > 0.0
+                    ? std::clamp((sourcePixel.alpha() / 65535.0) / sourceCoverage,
+                                 0.0, 1.0)
+                    : 0.0;
                 if (sixteenBit) {
-                    const QRgba64 sourcePixel = reinterpret_cast<const QRgba64 *>(
-                        straight.constScanLine(sy))[sx];
-                    const QRgba64 coveragePixel = reinterpret_cast<const QRgba64 *>(
-                        coverageStraight.constScanLine(sy))[sx];
-                    const double sourceCoverage = coveragePixel.alpha() / 65535.0;
-                    const double styleAlpha = sourceCoverage > 0.0
-                        ? std::clamp((sourcePixel.alpha() / 65535.0) / sourceCoverage,
-                                     0.0, 1.0)
-                        : 0.0;
                     const quint16 alpha = static_cast<quint16>(std::lround(
                         std::clamp(outputAlpha[outputIndex] * styleAlpha, 0.0, 1.0)
                         * 65535.0));
@@ -1036,18 +1042,10 @@ QImage featherSemanticCoverage(const LayerNode &layer,
                         QRgba64::fromRgba64(sourcePixel.red(), sourcePixel.green(),
                                            sourcePixel.blue(), alpha);
                 } else {
-                    const uchar *sourcePixel = straight.constScanLine(sy) + sx * 4;
-                    const uchar *coveragePixel =
-                        coverageStraight.constScanLine(sy) + sx * 4;
-                    const double sourceCoverage = coveragePixel[3] / 255.0;
-                    const double styleAlpha = sourceCoverage > 0.0
-                        ? std::clamp((sourcePixel[3] / 255.0) / sourceCoverage,
-                                     0.0, 1.0)
-                        : 0.0;
                     uchar *target = output.scanLine(oy) + ox * 4;
-                    target[0] = sourcePixel[0];
-                    target[1] = sourcePixel[1];
-                    target[2] = sourcePixel[2];
+                    target[0] = static_cast<uchar>(std::lround(sourcePixel.red() / 257.0));
+                    target[1] = static_cast<uchar>(std::lround(sourcePixel.green() / 257.0));
+                    target[2] = static_cast<uchar>(std::lround(sourcePixel.blue() / 257.0));
                     target[3] = static_cast<uchar>(std::lround(
                         std::clamp(outputAlpha[outputIndex] * styleAlpha, 0.0, 1.0)
                         * 255.0));

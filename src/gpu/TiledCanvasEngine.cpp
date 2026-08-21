@@ -2447,7 +2447,8 @@ QImage TiledCanvasEngine::renderRegion(const QImage &source,
                                        RenderInfo *renderInfo,
                                        const QUuid &documentSessionId,
                                        const quint64 colourStateRevision,
-                                       const ColourProcessingCompatibility processingCompatibility)
+                                       const ColourProcessingCompatibility processingCompatibility,
+                                       const bool forceExactCpuReference)
 {
     RenderInfo localInfo;
     const auto cancelled = [&] {
@@ -2511,6 +2512,31 @@ QImage TiledCanvasEngine::renderRegion(const QImage &source,
     localInfo.visiblePassThroughGroups = hierarchy.passThroughGroups;
     localInfo.visibleIsolatedGroups = hierarchy.isolatedGroups;
     localInfo.maximumGroupDepth = hierarchy.maximumDepth;
+
+    if (forceExactCpuReference) {
+        QImage fallback;
+        try {
+            fallback = ImageProcessor::renderRegion(source,
+                                                    layers,
+                                                    clipped,
+                                                    documentSize,
+                                                    cancelRequested,
+                                                    processingCompatibility);
+        } catch (const std::bad_alloc &) {
+            fallback = {};
+        }
+        if (cancelled()) {
+            return abandonCancelled();
+        }
+        localInfo.usedCpu = !fallback.isNull();
+        localInfo.path = QStringLiteral("CPU exact reference compositor");
+        localInfo.fallbackReason = QStringLiteral(
+            "Fractional adjustment or Live Filter coverage uses the exact CPU "
+            "reference until that compositing path passes dedicated GPU parity");
+        m_lastBackend = localInfo.path;
+        publishInfo(localInfo);
+        return fallback;
+    }
 
     QImage result(clipped.size(), tiledWorkingFormat(source));
     if (result.isNull()) {
