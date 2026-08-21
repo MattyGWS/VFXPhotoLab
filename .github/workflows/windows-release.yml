@@ -121,10 +121,31 @@ jobs:
         run: |
           $testDir = (Resolve-Path "build/windows-release").Path
           $junit = Join-Path $testDir "ctest-results.xml"
-          ctest --test-dir $testDir `
+          & ctest --test-dir $testDir `
             --output-on-failure `
             --output-junit $junit `
             -C Release
+          $ctestExit = $LASTEXITCODE
+
+          if ($ctestExit -ne 0) {
+            # Each CTest entry forces QtTest's plain-text logger to a file from
+            # the authoritative first execution. Print those files here so
+            # `gh run view --log-failed` contains the exact failing functions,
+            # comparisons and crash context without re-running stateful tests.
+            $diagDir = Join-Path $testDir "qtest-diagnostics"
+            Write-Host "::group::QtTest first-run diagnostics"
+            if (Test-Path $diagDir) {
+              foreach ($log in Get-ChildItem -Path $diagDir -Filter "*.txt" | Sort-Object Name) {
+                Write-Host ""
+                Write-Host "===== $($log.BaseName) ====="
+                Get-Content -Path $log.FullName
+              }
+            } else {
+              Write-Host "(No QtTest diagnostic directory was created.)"
+            }
+            Write-Host "::endgroup::"
+            exit $ctestExit
+          }
 
       - name: Install portable tree and deploy Qt
         shell: pwsh
@@ -256,6 +277,7 @@ jobs:
             build/portable-smoke.json
             build/installed-smoke.json
             build/windows-release/Testing/Temporary/LastTest.log
+            build/windows-release/qtest-diagnostics/*.txt
             build/windows-release/ctest-results.xml
           if-no-files-found: ignore
           retention-days: 14

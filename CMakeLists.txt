@@ -498,19 +498,33 @@ endif()
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
+
+    # Force QtTest's plain-text logger to a file owned by the authoritative
+    # CTest invocation. On Windows/Qt some runners may route the default logger
+    # away from CTest even when the executable uses the console subsystem.
+    # File output keeps the real first-run assertion/crash context available to
+    # CI without re-running stateful tests after a failure.
+    set(VFXPHOTOLAB_QTTEST_DIAGNOSTIC_DIR
+        "${CMAKE_BINARY_DIR}/qtest-diagnostics")
+    file(MAKE_DIRECTORY "${VFXPHOTOLAB_QTTEST_DIAGNOSTIC_DIR}")
+    function(vfxphotolab_add_qtest test_target)
+        add_test(NAME ${test_target}
+            COMMAND ${test_target}
+                -o "${VFXPHOTOLAB_QTTEST_DIAGNOSTIC_DIR}/${test_target}.txt,txt")
+    endfunction()
+
     qt_add_executable(VFXPhotoLabTests
         tests/test_core.cpp
     )
     target_link_libraries(VFXPhotoLabTests PRIVATE vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabTests COMMAND VFXPhotoLabTests)
+    vfxphotolab_add_qtest(VFXPhotoLabTests)
 
     qt_add_executable(VFXPhotoLabColourManagementTests
         tests/test_colour_management.cpp
     )
     target_link_libraries(VFXPhotoLabColourManagementTests
         PRIVATE vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabColourManagementTests
-             COMMAND VFXPhotoLabColourManagementTests)
+    vfxphotolab_add_qtest(VFXPhotoLabColourManagementTests)
 
     qt_add_executable(VFXPhotoLabLutConformanceTests
         tests/test_lut_conformance.cpp
@@ -519,16 +533,14 @@ if(BUILD_TESTING)
         vfxphotolab_core Qt6::Test)
     target_compile_definitions(VFXPhotoLabLutConformanceTests PRIVATE
         VFXPHOTOLAB_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-    add_test(NAME VFXPhotoLabLutConformanceTests
-             COMMAND VFXPhotoLabLutConformanceTests)
+    vfxphotolab_add_qtest(VFXPhotoLabLutConformanceTests)
 
     qt_add_executable(VFXPhotoLabSpatialFilterTests
         tests/test_spatial_filters.cpp
     )
     target_link_libraries(VFXPhotoLabSpatialFilterTests PRIVATE
         vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabSpatialFilterTests
-             COMMAND VFXPhotoLabSpatialFilterTests)
+    vfxphotolab_add_qtest(VFXPhotoLabSpatialFilterTests)
 
     qt_add_executable(VFXPhotoLabColourAdjustmentEssentialsTests
         tests/test_colour_adjustment_essentials.cpp
@@ -537,8 +549,7 @@ if(BUILD_TESTING)
         vfxphotolab_core Qt6::Test)
     target_compile_definitions(VFXPhotoLabColourAdjustmentEssentialsTests PRIVATE
         VFXPHOTOLAB_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-    add_test(NAME VFXPhotoLabColourAdjustmentEssentialsTests
-             COMMAND VFXPhotoLabColourAdjustmentEssentialsTests)
+    vfxphotolab_add_qtest(VFXPhotoLabColourAdjustmentEssentialsTests)
 
     qt_add_executable(VFXPhotoLabAdvancedColourControlsTests
         tests/test_advanced_colour_controls.cpp
@@ -547,31 +558,28 @@ if(BUILD_TESTING)
         vfxphotolab_core Qt6::Test)
     target_compile_definitions(VFXPhotoLabAdvancedColourControlsTests PRIVATE
         VFXPHOTOLAB_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-    add_test(NAME VFXPhotoLabAdvancedColourControlsTests
-             COMMAND VFXPhotoLabAdvancedColourControlsTests)
+    vfxphotolab_add_qtest(VFXPhotoLabAdvancedColourControlsTests)
 
     qt_add_executable(VFXPhotoLabOpticalSpatialColourEffectsTests
         tests/test_optical_spatial_colour_effects.cpp
     )
     target_link_libraries(VFXPhotoLabOpticalSpatialColourEffectsTests PRIVATE
         vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabOpticalSpatialColourEffectsTests
-             COMMAND VFXPhotoLabOpticalSpatialColourEffectsTests)
+    vfxphotolab_add_qtest(VFXPhotoLabOpticalSpatialColourEffectsTests)
 
     qt_add_executable(VFXPhotoLabAdditionalSpatialFiltersTests
         tests/test_additional_spatial_filters.cpp
     )
     target_link_libraries(VFXPhotoLabAdditionalSpatialFiltersTests PRIVATE
         vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabAdditionalSpatialFiltersTests
-             COMMAND VFXPhotoLabAdditionalSpatialFiltersTests)
+    vfxphotolab_add_qtest(VFXPhotoLabAdditionalSpatialFiltersTests)
 
     qt_add_executable(VFXPhotoLabPresetTests
         tests/test_presets.cpp
     )
     target_link_libraries(VFXPhotoLabPresetTests PRIVATE
         vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabPresetTests COMMAND VFXPhotoLabPresetTests)
+    vfxphotolab_add_qtest(VFXPhotoLabPresetTests)
 
 
     qt_add_executable(VFXPhotoLabExportProfileTests
@@ -579,8 +587,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(VFXPhotoLabExportProfileTests PRIVATE
         vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabExportProfileTests
-             COMMAND VFXPhotoLabExportProfileTests)
+    vfxphotolab_add_qtest(VFXPhotoLabExportProfileTests)
 
 
     qt_add_executable(VFXPhotoLabProductionExportTests
@@ -588,23 +595,21 @@ if(BUILD_TESTING)
     )
     target_link_libraries(VFXPhotoLabProductionExportTests PRIVATE
         vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabProductionExportTests
-             COMMAND VFXPhotoLabProductionExportTests)
+    vfxphotolab_add_qtest(VFXPhotoLabProductionExportTests)
 
     qt_add_executable(VFXPhotoLabExportQueueTests
         tests/test_export_queue.cpp
     )
     target_link_libraries(VFXPhotoLabExportQueueTests PRIVATE
         vfxphotolab_core Qt6::Test)
-    add_test(NAME VFXPhotoLabExportQueueTests
-             COMMAND VFXPhotoLabExportQueueTests)
+    vfxphotolab_add_qtest(VFXPhotoLabExportQueueTests)
 
     qt_add_executable(VFXPhotoLabSvgTests
         tests/test_svg.cpp
     )
     target_link_libraries(VFXPhotoLabSvgTests PRIVATE
         vfxphotolab_core Qt6::Gui Qt6::Widgets Qt6::Test)
-    add_test(NAME VFXPhotoLabSvgTests COMMAND VFXPhotoLabSvgTests)
+    vfxphotolab_add_qtest(VFXPhotoLabSvgTests)
     set_tests_properties(VFXPhotoLabSvgTests PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
@@ -613,7 +618,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(VFXPhotoLabTextTests PRIVATE
         vfxphotolab_core Qt6::Gui Qt6::Widgets Qt6::Test)
-    add_test(NAME VFXPhotoLabTextTests COMMAND VFXPhotoLabTextTests)
+    vfxphotolab_add_qtest(VFXPhotoLabTextTests)
     set_tests_properties(VFXPhotoLabTextTests PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
@@ -644,7 +649,7 @@ if(BUILD_TESTING)
         vfxphotolab_core
         Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
     target_include_directories(VFXPhotoLabCanvasTests PRIVATE src)
-    add_test(NAME VFXPhotoLabCanvasTests COMMAND VFXPhotoLabCanvasTests)
+    vfxphotolab_add_qtest(VFXPhotoLabCanvasTests)
     set_tests_properties(VFXPhotoLabCanvasTests PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

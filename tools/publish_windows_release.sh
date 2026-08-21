@@ -81,12 +81,17 @@ CURRENT_BRANCH="$(git branch --show-current)"
 [[ -f .github/workflows/$WORKFLOW_FILE ]] || fail ".github/workflows/$WORKFLOW_FILE is missing."
 [[ -f CHANGELOG.md ]] || fail "CHANGELOG.md is missing."
 
-# CI failure dumps are maintainer-local diagnostics, never release source.
-# Remove any such files that were accidentally tracked by an older run before
-# the all-changes release commit below; ignored/untracked copies remain local.
+# CI failure dumps and downloaded diagnostics are maintainer-local, never
+# release source. Remove any copies that were accidentally tracked by an older
+# run before the all-changes release commit below; ignored/untracked copies
+# remain local.
 while IFS= read -r -d '' diagnostic; do
   rm -f -- "$diagnostic"
 done < <(git ls-files -z -- 'windows-build-failure-*')
+
+while IFS= read -r -d '' diagnostic; do
+  rm -f -- "$diagnostic"
+done < <(git ls-files -z -- 'windows-diagnostics-*/*')
 
 git diff --check || fail "Git found whitespace/conflict-marker errors."
 

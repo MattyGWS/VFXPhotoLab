@@ -119,4 +119,4 @@ The current Windows installer and executable are unsigned. Microsoft Defender Sm
 
 ## Windows CI test diagnostics
 
-Windows test runners are deliberately console-subsystem executables even though the shipped application is a GUI-subsystem executable. This preserves QtTest assertion output in GitHub Actions. The release workflow also writes `build/windows-release/ctest-results.xml` and includes it, together with `LastTest.log`, in the always-uploaded `Windows-build-diagnostics-*` artifact.
+Windows test runners are deliberately console-subsystem executables even though the shipped application is a GUI-subsystem executable. Each authoritative CTest entry also forces QtTest's plain-text logger to `build/windows-release/qtest-diagnostics/<test>.txt`, avoiding Windows logger-routing differences without re-running tests. The workflow writes `build/windows-release/ctest-results.xml`; on failure it prints the first-run QtTest logs into the failed job and archives them together with `LastTest.log` and the CTest JUnit report. The original CTest result remains authoritative.
