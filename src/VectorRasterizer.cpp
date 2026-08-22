@@ -591,7 +591,7 @@ bool buildExactColourCarrier(const QImage &colourStraight,
     QImage output(outputRect.size(), QImage::Format_RGBA8888);
     if (output.isNull()) return false;
     output.fill(Qt::transparent);
-    output.setColorSpace(straight.colorSpace());
+    output.setColorSpace(semantic.colorSpace());
     if (!anyVisible) {
         *carrier = std::move(output);
         return true;
