@@ -158,14 +158,54 @@ jobs:
         shell: pwsh
         run: |
           $prefix = Join-Path (Resolve-Path .).Path "dist/VFX Photo Lab"
-          cmake --install build/windows-release --prefix $prefix --config Release
+          & cmake --install build/windows-release --prefix $prefix --config Release 2>&1 |
+            Tee-Object -FilePath build/windows-install.log
+          $installExit = $LASTEXITCODE
+          if ($installExit -ne 0) {
+            exit $installExit
+          }
+
+          # qt_generate_deploy_app_script() already invokes Qt's deployment
+          # machinery during cmake --install. Run the Windows deployment tool
+          # directly over the staged executable as a second, executable-driven
+          # pass so the portable tree is self-contained even if install-layout
+          # heuristics omit a runtime/plugin required by the flat Windows tree.
+          $portableExe = Join-Path $prefix "VFXPhotoLab.exe"
+          if (-not (Test-Path $portableExe)) {
+            throw "Portable install did not create $portableExe"
+          }
+          $deployTool = Get-Command windeployqt.exe -ErrorAction Stop
+          & $deployTool.Source `
+            --release `
+            --compiler-runtime `
+            --force `
+            --verbose 1 `
+            $portableExe 2>&1 |
+            Tee-Object -FilePath build/windows-windeployqt.log
+          $deployExit = $LASTEXITCODE
+          if ($deployExit -ne 0) {
+            exit $deployExit
+          }
+
+          $prefixPath = [System.IO.Path]::GetFullPath($prefix).TrimEnd('\')
+          Get-ChildItem -Path $prefix -Recurse -File |
+            Sort-Object FullName |
+            ForEach-Object {
+              $relative = $_.FullName.Substring($prefixPath.Length).TrimStart('\')
+              "{0}`t{1}" -f $relative, $_.Length
+            } | Set-Content -Path build/windows-portable-manifest.txt -Encoding utf8
 
       - name: Verify portable application
         shell: pwsh
         run: |
-          python tools/windows_release.py verify `
+          & python tools/windows_release.py verify `
             --dist "dist/VFX Photo Lab" `
-            --smoke-json build/portable-smoke.json
+            --smoke-json build/portable-smoke.json 2>&1 |
+            Tee-Object -FilePath build/windows-verify.log
+          $verifyExit = $LASTEXITCODE
+          if ($verifyExit -ne 0) {
+            exit $verifyExit
+          }
 
       - name: Install Inno Setup
         shell: pwsh
@@ -285,6 +325,10 @@ jobs:
             build/installed-smoke.json
             build/windows-build.log
             build/windows-ctest.log
+            build/windows-install.log
+            build/windows-windeployqt.log
+            build/windows-verify.log
+            build/windows-portable-manifest.txt
             build/windows-release/Testing/Temporary/LastTest.log
             build/windows-release/qtest-diagnostics/*.txt
             build/windows-release/ctest-results.xml

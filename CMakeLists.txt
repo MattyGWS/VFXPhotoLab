@@ -429,6 +429,19 @@ target_link_libraries(VFXPhotoLab
         Qt6::Concurrent
 )
 
+if(WIN32)
+    # The release smoke test and normal GUI startup require the native Windows
+    # platform plugin, while JPEG import/export requires qjpeg. Keep these as
+    # explicit additive deployment roots so Qt's deployment tooling cannot
+    # prune them when analysing the release executable. Other default plugins
+    # remain eligible for deployment.
+    qt_import_plugins(VFXPhotoLab
+        INCLUDE
+            Qt6::QWindowsIntegrationPlugin
+            Qt6::QJpegPlugin
+    )
+endif()
+
 if(VFXPHOTOLAB_ENABLE_WEBGPU AND VFXPHOTOLAB_WGPU_INCLUDE_DIR AND VFXPHOTOLAB_WGPU_LIBRARY)
     if(WIN32)
         find_file(VFXPHOTOLAB_WGPU_RUNTIME

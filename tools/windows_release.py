@@ -133,9 +133,17 @@ def _has_any_relative(root: Path, candidates: tuple[str, ...]) -> bool:
     return any(_relative_lower(path, root) in wanted for path in _all_files(root))
 
 
+def _write_json_report(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def command_verify(args: argparse.Namespace) -> int:
     dist = Path(args.dist).resolve()
     exe = dist / APP_EXE_NAME
+    smoke_json = Path(args.smoke_json).resolve()
+    if smoke_json.exists():
+        smoke_json.unlink()
     failures: list[str] = []
     if not exe.is_file():
         failures.append(f"Missing executable: {exe}")
@@ -158,6 +166,7 @@ def command_verify(args: argparse.Namespace) -> int:
             failures.append("Missing required packaged file: " + " or ".join(group))
 
     all_files = _all_files(dist) if dist.is_dir() else []
+    relative_files = [path.relative_to(dist).as_posix() for path in all_files]
     wgpu_dlls = [
         path
         for path in all_files
@@ -167,34 +176,110 @@ def command_verify(args: argparse.Namespace) -> int:
         failures.append("No wgpu-native DLL was found in the portable tree.")
 
     if failures:
-        for failure in failures:
-            print(f"ERROR: {failure}", file=sys.stderr)
+        report: dict[str, object] = {
+            "ok": False,
+            "stage": "preflight",
+            "version": metadata().version,
+            "dist": str(dist),
+            "executable": str(exe),
+            "failures": failures,
+            "files": relative_files,
+        }
+        _write_json_report(smoke_json, report)
+        print(json.dumps(report, indent=2), file=sys.stderr)
         return 1
 
-    smoke_json = Path(args.smoke_json).resolve()
-    smoke_json.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [
-            str(exe),
-            "--package-smoke-test",
-            "--require-full-release",
-            "--json",
-            str(smoke_json),
-        ],
-        cwd=dist,
-        timeout=args.timeout,
-        check=False,
-    )
+    command = [
+        str(exe),
+        "--package-smoke-test",
+        "--require-full-release",
+        "--json",
+        str(smoke_json),
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=dist,
+            timeout=args.timeout,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except subprocess.TimeoutExpired as error:
+        report = {
+            "ok": False,
+            "stage": "launch-timeout",
+            "version": metadata().version,
+            "dist": str(dist),
+            "executable": str(exe),
+            "timeoutSeconds": args.timeout,
+            "stdout": (error.stdout or "") if isinstance(error.stdout, str) else "",
+            "stderr": (error.stderr or "") if isinstance(error.stderr, str) else "",
+            "files": relative_files,
+        }
+        _write_json_report(smoke_json, report)
+        print(json.dumps(report, indent=2), file=sys.stderr)
+        return 1
+    except OSError as error:
+        report = {
+            "ok": False,
+            "stage": "launch-error",
+            "version": metadata().version,
+            "dist": str(dist),
+            "executable": str(exe),
+            "error": repr(error),
+            "files": relative_files,
+        }
+        _write_json_report(smoke_json, report)
+        print(json.dumps(report, indent=2), file=sys.stderr)
+        return 1
+
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if result.stderr:
+        print(result.stderr, end="" if result.stderr.endswith("\n") else "\n", file=sys.stderr)
+
     if result.returncode != 0:
         print(
-            f"ERROR: Packaged executable smoke test returned {result.returncode}.",
+            f"ERROR: Packaged executable smoke test returned {result.returncode} "+
+            f"(0x{result.returncode & 0xFFFFFFFF:08X}).",
             file=sys.stderr,
         )
         if smoke_json.is_file():
             print(smoke_json.read_text(encoding="utf-8"), file=sys.stderr)
-        return result.returncode or 1
+        else:
+            report = {
+                "ok": False,
+                "stage": "process-exit-before-report",
+                "version": metadata().version,
+                "dist": str(dist),
+                "executable": str(exe),
+                "processReturnCode": result.returncode,
+                "processReturnCodeHex": f"0x{result.returncode & 0xFFFFFFFF:08X}",
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "files": relative_files,
+            }
+            _write_json_report(smoke_json, report)
+            print(json.dumps(report, indent=2), file=sys.stderr)
+        return 1
     if not smoke_json.is_file():
-        print("ERROR: Packaged executable did not write its smoke-test report.", file=sys.stderr)
+        report = {
+            "ok": False,
+            "stage": "missing-report",
+            "version": metadata().version,
+            "dist": str(dist),
+            "executable": str(exe),
+            "processReturnCode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "files": relative_files,
+        }
+        _write_json_report(smoke_json, report)
+        print(json.dumps(report, indent=2), file=sys.stderr)
         return 1
     report = json.loads(smoke_json.read_text(encoding="utf-8"))
     if not report.get("ok"):
