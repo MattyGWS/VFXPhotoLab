@@ -114,7 +114,13 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: cmake --build build/windows-release --parallel
+        run: |
+          & cmake --build build/windows-release --parallel 2>&1 |
+            Tee-Object -FilePath build/windows-build.log
+          $buildExit = $LASTEXITCODE
+          if ($buildExit -ne 0) {
+            exit $buildExit
+          }
 
       - name: Run core tests
         shell: pwsh
@@ -276,6 +282,7 @@ jobs:
             build/release-notes.md
             build/portable-smoke.json
             build/installed-smoke.json
+            build/windows-build.log
             build/windows-release/Testing/Temporary/LastTest.log
             build/windows-release/qtest-diagnostics/*.txt
             build/windows-release/ctest-results.xml

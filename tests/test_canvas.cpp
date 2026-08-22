@@ -1260,18 +1260,17 @@ void CanvasTests::pretransformedVectorForegroundCommitsWithoutDoubleTransform()
     QCOMPARE(committed, live);
 }
 
-namespace {
+namespace vfx {
 
-class TransformTestCanvas final : public ImageCanvas
+class ImageCanvasTestPeer final
 {
 public:
-    using ImageCanvas::ImageCanvas;
-
-    void sendDirectTransformButton(const QEvent::Type type,
-                                   const QPointF &position,
-                                   const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    static void sendTransformButton(ImageCanvas &canvas,
+                                    const QEvent::Type type,
+                                    const QPointF &position,
+                                    const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
     {
-        const QPoint globalPoint = viewport()->mapToGlobal(position.toPoint());
+        const QPoint globalPoint = canvas.viewport()->mapToGlobal(position.toPoint());
         const Qt::MouseButtons buttons = type == QEvent::MouseButtonPress
             ? Qt::LeftButton : Qt::NoButton;
         QMouseEvent event(type,
@@ -1282,17 +1281,18 @@ public:
                           buttons,
                           modifiers);
         if (type == QEvent::MouseButtonPress) {
-            mousePressEvent(&event);
+            canvas.mousePressEvent(&event);
         } else {
             Q_ASSERT(type == QEvent::MouseButtonRelease);
-            mouseReleaseEvent(&event);
+            canvas.mouseReleaseEvent(&event);
         }
     }
 
-    void sendDirectTransformMove(const QPointF &position,
-                                 const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    static void sendTransformMove(ImageCanvas &canvas,
+                                  const QPointF &position,
+                                  const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
     {
-        const QPoint globalPoint = viewport()->mapToGlobal(position.toPoint());
+        const QPoint globalPoint = canvas.viewport()->mapToGlobal(position.toPoint());
         QMouseEvent event(QEvent::MouseMove,
                           position,
                           position,
@@ -1300,9 +1300,13 @@ public:
                           Qt::NoButton,
                           Qt::LeftButton,
                           modifiers);
-        mouseMoveEvent(&event);
+        canvas.mouseMoveEvent(&event);
     }
 };
+
+} // namespace vfx
+
+namespace {
 
 void sendTransformMove(QWidget *viewport,
                        const QPointF &position,
@@ -1401,7 +1405,7 @@ void CanvasTests::transformMoveSnapsAndControlBypasses()
 
 void CanvasTests::transformMoveUsesWholePixelLattice()
 {
-    TransformTestCanvas canvas;
+    ImageCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1429,8 +1433,8 @@ void CanvasTests::transformMoveUsesWholePixelLattice()
     const QPointF fractionalEnd =
         canvas.mapDocumentToViewport(QPointF(35.4, 52.6));
 
-    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, start);
-    canvas.sendDirectTransformMove(fractionalEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, start);
+    ImageCanvasTestPeer::sendTransformMove(canvas, fractionalEnd);
     QVERIFY(changed.count() >= 1);
     const QTransform snapped = qvariant_cast<QTransform>(changed.constLast().at(0));
     const QRectF snappedBounds = snapped.mapRect(selection);
@@ -1440,12 +1444,12 @@ void CanvasTests::transformMoveUsesWholePixelLattice()
     QVERIFY(std::abs(snappedBounds.top() - 44.0) < 0.01);
     QVERIFY(std::abs(snapped.dx() - 5.75) < 0.01);
     QVERIFY(std::abs(snapped.dy() - 3.75) < 0.01);
-    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, fractionalEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonRelease, fractionalEnd);
 
     changed.clear();
     canvas.setTransformSelectionBounds(selection);
-    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, start);
-    canvas.sendDirectTransformMove(fractionalEnd, Qt::ControlModifier);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, start);
+    ImageCanvasTestPeer::sendTransformMove(canvas, fractionalEnd, Qt::ControlModifier);
     QVERIFY(changed.count() >= 1);
     const QTransform free = qvariant_cast<QTransform>(changed.constLast().at(0));
     QVERIFY(std::abs(free.dx() - 5.4) < 0.01);
@@ -1453,7 +1457,7 @@ void CanvasTests::transformMoveUsesWholePixelLattice()
     const QRectF freeBounds = free.mapRect(selection);
     QVERIFY(!isPixelBoundaryCoordinate(freeBounds.left()));
     QVERIFY(!isPixelBoundaryCoordinate(freeBounds.top()));
-    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, fractionalEnd,
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonRelease, fractionalEnd,
                                      Qt::ControlModifier);
 }
 
@@ -1529,7 +1533,7 @@ void CanvasTests::transformResizeUsesPixelBoundaryLattice()
 
 void CanvasTests::persistentTransformGesturesCompose()
 {
-    TransformTestCanvas canvas;
+    ImageCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1547,17 +1551,17 @@ void CanvasTests::persistentTransformGesturesCompose()
         canvas.mapDocumentToViewport(QPointF(30.0, 48.0));
     const QPointF firstEnd =
         canvas.mapDocumentToViewport(QPointF(50.0, 48.0));
-    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, firstStart);
-    canvas.sendDirectTransformMove(firstEnd);
-    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, firstEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, firstStart);
+    ImageCanvasTestPeer::sendTransformMove(canvas, firstEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonRelease, firstEnd);
 
     const QPointF secondStart =
         canvas.mapDocumentToViewport(QPointF(50.0, 48.0));
     const QPointF secondEnd =
         canvas.mapDocumentToViewport(QPointF(60.0, 58.0));
-    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, secondStart);
-    canvas.sendDirectTransformMove(secondEnd);
-    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, secondEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, secondStart);
+    ImageCanvasTestPeer::sendTransformMove(canvas, secondEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonRelease, secondEnd);
 
     const QTransform accumulated = canvas.transformSessionTransform();
     QVERIFY(std::abs(accumulated.dx() - 30.0) < 0.01);
@@ -1566,7 +1570,7 @@ void CanvasTests::persistentTransformGesturesCompose()
 
 void CanvasTests::transformPivotMovesWithoutChangingSessionMatrix()
 {
-    TransformTestCanvas canvas;
+    ImageCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1584,9 +1588,9 @@ void CanvasTests::transformPivotMovesWithoutChangingSessionMatrix()
         canvas.mapDocumentToViewport(QPointF(40.0, 55.0));
     const QPointF pivotEnd =
         canvas.mapDocumentToViewport(QPointF(50.0, 65.0));
-    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, pivotStart);
-    canvas.sendDirectTransformMove(pivotEnd);
-    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, pivotEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, pivotStart);
+    ImageCanvasTestPeer::sendTransformMove(canvas, pivotEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonRelease, pivotEnd);
 
     QVERIFY(pivotChanged.count() >= 1);
     const QPointF pivot = canvas.transformPivot();
@@ -1597,7 +1601,7 @@ void CanvasTests::transformPivotMovesWithoutChangingSessionMatrix()
 
 void CanvasTests::transformScaleMovesPivotWithContent()
 {
-    TransformTestCanvas canvas;
+    ImageCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1615,9 +1619,9 @@ void CanvasTests::transformScaleMovesPivotWithContent()
         canvas.mapDocumentToViewport(QPointF(60.0, 55.0));
     const QPointF scaleEnd =
         canvas.mapDocumentToViewport(QPointF(80.0, 55.0));
-    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, scaleStart);
-    canvas.sendDirectTransformMove(scaleEnd);
-    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, scaleEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, scaleStart);
+    ImageCanvasTestPeer::sendTransformMove(canvas, scaleEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonRelease, scaleEnd);
 
     const QRectF scaled = canvas.transformSessionTransform().mapRect(
         QRectF(20.0, 40.0, 40.0, 30.0));
@@ -1628,7 +1632,7 @@ void CanvasTests::transformScaleMovesPivotWithContent()
 
 void CanvasTests::transformModesRestrictHandlesWithoutResettingSession()
 {
-    TransformTestCanvas canvas;
+    ImageCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1648,9 +1652,9 @@ void CanvasTests::transformModesRestrictHandlesWithoutResettingSession()
         canvas.mapDocumentToViewport(QPointF(58.0, 55.0));
     const QPointF moveEnd =
         canvas.mapDocumentToViewport(QPointF(68.0, 55.0));
-    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, moveStart);
-    canvas.sendDirectTransformMove(moveEnd);
-    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, moveEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, moveStart);
+    ImageCanvasTestPeer::sendTransformMove(canvas, moveEnd);
+    ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonRelease, moveEnd);
     const QTransform moved = canvas.transformSessionTransform();
     QVERIFY(std::abs(moved.mapRect(selection).width() - selection.width()) < 0.01);
     QVERIFY(std::abs(moved.dx() - 10.0) < 0.01);

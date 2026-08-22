@@ -34,6 +34,7 @@ namespace vfx {
 
 class CanvasRuler;
 class DisplayColourTransform;
+class ImageCanvasTestPeer;
 
 enum class CanvasPaintMode {
     None,
@@ -437,6 +438,7 @@ protected:
 
 private:
     friend class CanvasRuler;
+    friend class ImageCanvasTestPeer;
 
     struct GuideHit {
         Qt::Orientation orientation = Qt::Horizontal;
