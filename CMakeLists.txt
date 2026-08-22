@@ -510,7 +510,8 @@ if(BUILD_TESTING)
     function(vfxphotolab_add_qtest test_target)
         add_test(NAME ${test_target}
             COMMAND ${test_target}
-                -o "${VFXPHOTOLAB_QTTEST_DIAGNOSTIC_DIR}/${test_target}.txt,txt")
+                -o "${VFXPHOTOLAB_QTTEST_DIAGNOSTIC_DIR}/${test_target}.txt,txt"
+                -o "-,txt")
     endfunction()
 
     qt_add_executable(VFXPhotoLabTests

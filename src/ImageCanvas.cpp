@@ -3503,7 +3503,12 @@ void ImageCanvas::mousePressEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton && m_transformDragEnabled && !m_spaceHeld) {
         const CanvasTransformMode mode = transformModeAt(event->position());
         if (mode != CanvasTransformMode::None) {
-            const QPointF documentPosition = documentPositionAtUnclamped(event->position());
+            // Transform bounds/handles live in document-edge coordinates (0..width,
+            // 0..height), matching documentToViewportTransform().  Using the
+            // pixel-centre inverse (0..width-1) subtly shrinks every pointer
+            // delta and makes transform gestures size-dependent.
+            const QPointF documentPosition =
+                documentEdgePositionAtUnclamped(event->position());
             m_transformGestureBaseTransform = m_transformCurrentTransform;
             m_transformGestureBaseQuad = transformDocumentQuad(
                 m_transformGestureBaseTransform);
@@ -3761,7 +3766,8 @@ void ImageCanvas::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_transformPivotDragging && (event->buttons() & Qt::LeftButton)) {
-        m_transformPivotDocument = documentPositionAtUnclamped(event->position());
+        m_transformPivotDocument =
+            documentEdgePositionAtUnclamped(event->position());
         m_transformPivotValid = true;
         emit transformPivotChanged(m_transformPivotDocument);
         viewport()->update();
@@ -3770,7 +3776,8 @@ void ImageCanvas::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_transformDragging && (event->buttons() & Qt::LeftButton)) {
-        const QPointF position = documentPositionAtUnclamped(event->position());
+        const QPointF position =
+            documentEdgePositionAtUnclamped(event->position());
         m_transformCurrentTransform = transformFromPointer(position, event->modifiers());
         emit transformDragChanged(m_transformCurrentTransform);
         event->accept();
@@ -3967,7 +3974,8 @@ void ImageCanvas::mouseReleaseEvent(QMouseEvent *event)
     }
 
     if (m_transformPivotDragging && event->button() == Qt::LeftButton) {
-        m_transformPivotDocument = documentPositionAtUnclamped(event->position());
+        m_transformPivotDocument =
+            documentEdgePositionAtUnclamped(event->position());
         m_transformPivotValid = true;
         m_transformPivotDragging = false;
         m_transformMode = CanvasTransformMode::None;
@@ -3979,7 +3987,8 @@ void ImageCanvas::mouseReleaseEvent(QMouseEvent *event)
     }
 
     if (m_transformDragging && event->button() == Qt::LeftButton) {
-        const QPointF position = documentPositionAtUnclamped(event->position());
+        const QPointF position =
+            documentEdgePositionAtUnclamped(event->position());
         m_transformCurrentTransform = transformFromPointer(position, event->modifiers());
         m_transformDragging = false;
         const QTransform finishedTransform = m_transformCurrentTransform;

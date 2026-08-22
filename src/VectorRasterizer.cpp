@@ -517,6 +517,12 @@ QRect expandedRect(const QRect &rect, const int horizontal, const int vertical)
                         static_cast<int>(std::clamp(bottom, minimum, maximum))));
 }
 
+// Keep semantic colour-carrier selection identical at 8- and 16-bit.
+// Canonical RGBA64 antialiasing can contain sub-code-value coverage that an
+// RGBA8 raster cannot represent; those samples must not select a different
+// nearest authored colour than the 8-bit contract.
+constexpr double MinimumEightBitCarrierCoverage = 0.5 / 255.0;
+
 bool buildExactColourCarrier(const QImage &colourStraight,
                              const QImage &styleStraight,
                              const QImage &coverageStraight,
@@ -559,7 +565,8 @@ bool buildExactColourCarrier(const QImage &colourStraight,
         }
         visibleXs.clear();
         for (int sx = 0; sx < sourceWidth; ++sx) {
-            if (sourcePixelAlpha(coverageStraight, sx, sy) > 0.0) {
+            if (sourcePixelAlpha(coverageStraight, sx, sy)
+                >= MinimumEightBitCarrierCoverage) {
                 visibleXs.push_back(sx);
             }
         }
@@ -913,7 +920,8 @@ QImage featherSemanticCoverage(const LayerNode &layer,
                 // references. Tiny 16-bit-only antialias coverage that would
                 // quantise to zero in RGBA8 must not select a different nearest
                 // authored colour carrier at a feather edge.
-                if (sourcePixelAlpha(coverageStraight, sx, sy) >= (0.5 / 255.0)) {
+                if (sourcePixelAlpha(coverageStraight, sx, sy)
+                    >= MinimumEightBitCarrierCoverage) {
                     visibleXs.push_back(sx);
                 }
             }

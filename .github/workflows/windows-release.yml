@@ -130,7 +130,8 @@ jobs:
           & ctest --test-dir $testDir `
             --output-on-failure `
             --output-junit $junit `
-            -C Release
+            -C Release 2>&1 |
+            Tee-Object -FilePath build/windows-ctest.log
           $ctestExit = $LASTEXITCODE
 
           if ($ctestExit -ne 0) {
@@ -283,6 +284,7 @@ jobs:
             build/portable-smoke.json
             build/installed-smoke.json
             build/windows-build.log
+            build/windows-ctest.log
             build/windows-release/Testing/Temporary/LastTest.log
             build/windows-release/qtest-diagnostics/*.txt
             build/windows-release/ctest-results.xml
