@@ -517,7 +517,8 @@ QRect expandedRect(const QRect &rect, const int horizontal, const int vertical)
                         static_cast<int>(std::clamp(bottom, minimum, maximum))));
 }
 
-bool buildExactColourCarrier(const QImage &straight,
+bool buildExactColourCarrier(const QImage &colourStraight,
+                             const QImage &styleStraight,
                              const QImage &coverageStraight,
                              const QRect &sourceRect,
                              const QRect &outputRect,
@@ -526,15 +527,16 @@ bool buildExactColourCarrier(const QImage &straight,
                              QImage *carrier,
                              const std::atomic_bool *cancelRequested)
 {
-    if (!carrier || straight.isNull() || coverageStraight.isNull()
-        || straight.size() != sourceRect.size()
+    if (!carrier || colourStraight.isNull() || styleStraight.isNull()
+        || coverageStraight.isNull()
+        || colourStraight.size() != sourceRect.size()
+        || styleStraight.size() != sourceRect.size()
         || coverageStraight.size() != sourceRect.size()
         || outputRect.isEmpty() || supportX < 0 || supportY < 0) {
         return false;
     }
-    const QImage semantic = straight.convertToFormat(QImage::Format_RGBA8888);
-    const QImage coverage = coverageStraight.convertToFormat(QImage::Format_RGBA8888);
-    if (semantic.isNull() || coverage.isNull()) return false;
+    const QImage semantic = colourStraight.convertToFormat(QImage::Format_RGBA8888);
+    if (semantic.isNull()) return false;
 
     const int sourceWidth = sourceRect.width();
     const int sourceHeight = sourceRect.height();
@@ -556,9 +558,10 @@ bool buildExactColourCarrier(const QImage &straight,
             return false;
         }
         visibleXs.clear();
-        const uchar *coverageRow = coverage.constScanLine(sy);
         for (int sx = 0; sx < sourceWidth; ++sx) {
-            if (coverageRow[sx * 4 + 3] > 0) visibleXs.push_back(sx);
+            if (sourcePixelAlpha(coverageStraight, sx, sy) > 0.0) {
+                visibleXs.push_back(sx);
+            }
         }
         anyVisible = anyVisible || !visibleXs.isEmpty();
         qsizetype rightIndex = 0;
@@ -687,16 +690,28 @@ bool buildExactColourCarrier(const QImage &straight,
             if (sy < 0 || sx < 0) continue;
 
             const uchar *sourcePixel = semantic.constScanLine(sy) + sx * 4;
-            const uchar *coveragePixel = coverage.constScanLine(sy) + sx * 4;
-            const double sourceCoverage = coveragePixel[3] / 255.0;
+            const double sourceCoverage = sourcePixelAlpha(coverageStraight, sx, sy);
+            const double semanticAlpha = sourcePixelAlpha(styleStraight, sx, sy);
             const double styleAlpha = sourceCoverage > 0.0
-                ? std::clamp((sourcePixel[3] / 255.0) / sourceCoverage,
-                             0.0, 1.0)
+                ? std::clamp(semanticAlpha / sourceCoverage, 0.0, 1.0)
                 : 0.0;
             uchar *target = output.scanLine(oy) + ox * 4;
-            target[0] = sourcePixel[0];
-            target[1] = sourcePixel[1];
-            target[2] = sourcePixel[2];
+            if (sourcePixel[3] > 0 || semanticAlpha <= 0.0) {
+                target[0] = sourcePixel[0];
+                target[1] = sourcePixel[1];
+                target[2] = sourcePixel[2];
+            } else if (styleStraight.depth() > 32) {
+                const QRgba64 canonical = reinterpret_cast<const QRgba64 *>(
+                    styleStraight.constScanLine(sy))[sx];
+                target[0] = static_cast<uchar>(std::lround(canonical.red() / 257.0));
+                target[1] = static_cast<uchar>(std::lround(canonical.green() / 257.0));
+                target[2] = static_cast<uchar>(std::lround(canonical.blue() / 257.0));
+            } else {
+                const uchar *canonical = styleStraight.constScanLine(sy) + sx * 4;
+                target[0] = canonical[0];
+                target[1] = canonical[1];
+                target[2] = canonical[2];
+            }
             target[3] = static_cast<uchar>(std::lround(styleAlpha * 255.0));
         }
     }
@@ -865,14 +880,11 @@ QImage featherSemanticCoverage(const LayerNode &layer,
                 layer, layerFingerprint, previewSize, sourceRect, documentSize,
                 worldTransform, QImage::Format_RGBA8888, colourSpace,
                 forceOpaquePixelAlpha, grayscaleDocument, false, cancelRequested);
-            const QImage silhouette8 = renderSemanticRegion(
-                layer, layerFingerprint, previewSize, sourceRect, documentSize,
-                worldTransform, QImage::Format_RGBA8888, colourSpace,
-                forceOpaquePixelAlpha, grayscaleDocument, true, cancelRequested);
-            if (semantic8.isNull() || silhouette8.isNull()
-                || !buildExactColourCarrier(semantic8, silhouette8, sourceRect,
-                                            previewRegion, kernelX.support,
-                                            kernelY.support, &exactEightBitCarrier,
+            if (semantic8.isNull()
+                || !buildExactColourCarrier(semantic8, straight, coverageStraight,
+                                            sourceRect, previewRegion,
+                                            kernelX.support, kernelY.support,
+                                            &exactEightBitCarrier,
                                             cancelRequested)) {
                 return {};
             }
@@ -1246,14 +1258,14 @@ bool VectorRasterizer::prepareGpuFeatherTile(
             * sourceRect.height();
         const qint64 outputPixels = static_cast<qint64>(previewRegion.width())
             * previewRegion.height();
-        // Account conservatively for the two semantic source images, the
-        // temporary straight-format carrier inputs that may detach during
-        // conversion, the prepared coverage image, nearest-X scratch and the
-        // output colour carrier. Keep the declared 256 MiB guard honest even
-        // for unusual direct callers with output regions much larger than a
-        // normal 256x256 compositor tile.
+        // Account conservatively for the RGBA8 semantic/coverage inputs plus
+        // the canonical RGBA64 semantic/coverage pair used to choose exactly
+        // the same nearest authored source at both output depths, along with
+        // carrier scratch, prepared coverage, nearest-X state and output.
+        // Keep the declared 256 MiB guard honest even for unusual direct callers
+        // with output regions much larger than a normal 256x256 compositor tile.
         const long double estimatedBytes =
-            static_cast<long double>(sourcePixels) * 20.0L
+            static_cast<long double>(sourcePixels) * 40.0L
             + static_cast<long double>(sourceRect.height())
                 * previewRegion.width() * sizeof(int)
             + static_cast<long double>(outputPixels) * 8.0L
@@ -1276,7 +1288,16 @@ bool VectorRasterizer::prepareGpuFeatherTile(
             layer, layerFingerprint, previewSize, sourceRect, documentSize,
             worldTransform, QImage::Format_RGBA8888, colourSpace,
             forceOpaquePixelAlpha, grayscaleDocument, true, cancelRequested);
-        if (semantic.isNull() || coverage.isNull()) {
+        const QImage canonicalSemantic = renderSemanticRegion(
+            layer, layerFingerprint, previewSize, sourceRect, documentSize,
+            worldTransform, QImage::Format_RGBA64, colourSpace,
+            forceOpaquePixelAlpha, grayscaleDocument, false, cancelRequested);
+        const QImage canonicalCoverage = renderSemanticRegion(
+            layer, layerFingerprint, previewSize, sourceRect, documentSize,
+            worldTransform, QImage::Format_RGBA64, colourSpace,
+            forceOpaquePixelAlpha, grayscaleDocument, true, cancelRequested);
+        if (semantic.isNull() || coverage.isNull()
+            || canonicalSemantic.isNull() || canonicalCoverage.isNull()) {
             if (errorMessage) {
                 *errorMessage = QStringLiteral(
                     "The semantic vector Feather inputs could not be rasterised");
@@ -1285,7 +1306,8 @@ bool VectorRasterizer::prepareGpuFeatherTile(
         }
 
         QImage carrier;
-        if (!buildExactColourCarrier(semantic, coverage, sourceRect, previewRegion,
+        if (!buildExactColourCarrier(semantic, canonicalSemantic,
+                                     canonicalCoverage, sourceRect, previewRegion,
                                      kernelX.support, kernelY.support, &carrier,
                                      cancelRequested)) {
             if (errorMessage) {

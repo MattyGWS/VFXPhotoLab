@@ -91,7 +91,11 @@ done < <(git ls-files -z -- 'windows-build-failure-*')
 
 while IFS= read -r -d '' diagnostic; do
   rm -f -- "$diagnostic"
-done < <(git ls-files -z -- 'windows-diagnostics-*/*')
+done < <(git ls-files -z -- \
+  'windows-diagnostics-*' \
+  'windows-diagnostics-*/*' \
+  'Windows-build-diagnostics-*' \
+  'Windows-build-diagnostics-*/*')
 
 git diff --check || fail "Git found whitespace/conflict-marker errors."
 

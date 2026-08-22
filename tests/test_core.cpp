@@ -5677,10 +5677,50 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     QVERIFY(!preSmartTransformError.isEmpty());
 
     // A snapshot that claims the pre-Feather residency envelope must not be
-    // allowed to smuggle in non-zero schema-8 Feather state. This protects
-    // Hot/Warm/Cold migration from silently changing project semantics.
+    // allowed to smuggle in non-zero schema-8 Feather state. Use a dedicated
+    // fixture with the Feather vector as the first root layer: v18 added
+    // per-layer Smart fields, so merely relabelling the large v28 integration
+    // snapshot as v16 can desynchronise on an earlier raster layer before the
+    // reader ever reaches the Feather feature gate.
+    DocumentSession legacyFeatherFixture;
+    NewDocumentSettings legacyFeatherSettings;
+    legacyFeatherSettings.name = QStringLiteral("Pre-Feather Gate Fixture");
+    legacyFeatherSettings.pixelSize = QSize(8, 8);
+    legacyFeatherSettings.bitDepth = 8;
+    legacyFeatherSettings.colourModel = DocumentColourModel::Rgb;
+    legacyFeatherSettings.colourSpace = QColorSpace(QColorSpace::SRgb);
+    legacyFeatherSettings.backgroundColour = QColor(0, 0, 0, 0);
+    QVERIFY2(legacyFeatherFixture.document().createNewDocument(
+                 legacyFeatherSettings, &error),
+             qPrintable(error));
+    const QUuid legacyFeatherVectorId =
+        legacyFeatherFixture.document().addVectorShape(
+            VectorShapeType::Rectangle, QRectF(1.0, 1.0, 5.0, 5.0),
+            QColor(210, 70, 40, 255));
+    QVERIFY(!legacyFeatherVectorId.isNull());
+    QVERIFY(legacyFeatherFixture.document().updateLayer(
+        legacyFeatherVectorId, [](LayerNode &layer) {
+            layer.vectorData.featherRadius = 3.5;
+            layer.vectorData.normalise();
+        }));
+    QVERIFY(legacyFeatherFixture.document().moveLayers(
+        {legacyFeatherVectorId}, {}, 0));
+
+    QString legacyFeatherSnapshotPath;
+    qint64 legacyFeatherSnapshotBytes = 0;
+    QVERIFY2(store.writeSnapshot(legacyFeatherFixture,
+                                 &legacyFeatherSnapshotPath,
+                                 &legacyFeatherSnapshotBytes,
+                                 &error),
+             qPrintable(error));
+    QVERIFY(legacyFeatherSnapshotBytes > 0);
+    QFile legacyFeatherSnapshot(legacyFeatherSnapshotPath);
+    QVERIFY(legacyFeatherSnapshot.open(QIODevice::ReadOnly));
+    const QByteArray currentFeatherEnvelope = legacyFeatherSnapshot.readAll();
+    legacyFeatherSnapshot.close();
+
     const QByteArray legacyEnvelope = snapshotEnvelopeForPreIdentityVersion(
-        currentSessionEnvelope, 16);
+        currentFeatherEnvelope, 16);
     QVERIFY(!legacyEnvelope.isEmpty());
     const QString dishonestLegacyPath = temporaryDirectory.filePath(
         QStringLiteral("dishonest-pre-feather-session.bin"));
@@ -5693,7 +5733,8 @@ void CoreTests::sessionSnapshotRoundTripPreservesExactDocumentAndEditorState()
     QString legacyError;
     QVERIFY(!store.restoreSnapshot(dishonestLegacyPath, &rejectedLegacy,
                                    &legacyError));
-    QVERIFY(legacyError.contains(QStringLiteral("Feather"), Qt::CaseInsensitive));
+    QVERIFY2(legacyError.contains(QStringLiteral("Feather"), Qt::CaseInsensitive),
+             qPrintable(legacyError));
 
     DocumentSession restored;
     QVERIFY2(store.restoreSnapshot(snapshotPath, &restored, &error), qPrintable(error));

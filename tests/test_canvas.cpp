@@ -1262,6 +1262,48 @@ void CanvasTests::pretransformedVectorForegroundCommitsWithoutDoubleTransform()
 
 namespace {
 
+class TransformTestCanvas final : public ImageCanvas
+{
+public:
+    using ImageCanvas::ImageCanvas;
+
+    void sendDirectTransformButton(const QEvent::Type type,
+                                   const QPointF &position,
+                                   const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    {
+        const QPoint globalPoint = viewport()->mapToGlobal(position.toPoint());
+        const Qt::MouseButtons buttons = type == QEvent::MouseButtonPress
+            ? Qt::LeftButton : Qt::NoButton;
+        QMouseEvent event(type,
+                          position,
+                          position,
+                          QPointF(globalPoint),
+                          Qt::LeftButton,
+                          buttons,
+                          modifiers);
+        if (type == QEvent::MouseButtonPress) {
+            mousePressEvent(&event);
+        } else {
+            Q_ASSERT(type == QEvent::MouseButtonRelease);
+            mouseReleaseEvent(&event);
+        }
+    }
+
+    void sendDirectTransformMove(const QPointF &position,
+                                 const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    {
+        const QPoint globalPoint = viewport()->mapToGlobal(position.toPoint());
+        QMouseEvent event(QEvent::MouseMove,
+                          position,
+                          position,
+                          QPointF(globalPoint),
+                          Qt::NoButton,
+                          Qt::LeftButton,
+                          modifiers);
+        mouseMoveEvent(&event);
+    }
+};
+
 void sendTransformMove(QWidget *viewport,
                        const QPointF &position,
                        const Qt::KeyboardModifiers modifiers)
@@ -1277,41 +1319,6 @@ void sendTransformMove(QWidget *viewport,
     QCoreApplication::sendEvent(viewport, &moveEvent);
 }
 
-void sendTransformButton(QWidget *viewport,
-                         const QEvent::Type type,
-                         const QPointF &position,
-                         const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
-{
-    // Qt's platform plugins do not all route a hand-constructed button event
-    // through QAbstractScrollArea's viewport machinery identically. Use QtTest's
-    // supported button injection for press/release, while sendTransformMove()
-    // keeps the fractional local position required by transform-delta tests.
-    const QPoint pixelPosition = position.toPoint();
-    if (type == QEvent::MouseButtonPress) {
-        QTest::mousePress(viewport, Qt::LeftButton, modifiers, pixelPosition);
-    } else {
-        Q_ASSERT(type == QEvent::MouseButtonRelease);
-        QTest::mouseRelease(viewport, Qt::LeftButton, modifiers, pixelPosition);
-    }
-}
-
-QPointF documentPositionForButtonPoint(const ImageCanvas &canvas,
-                                       const QPoint &viewportPoint)
-{
-    bool invertible = false;
-    const QTransform viewportToDocument =
-        canvas.documentToViewportMapping().inverted(&invertible);
-    Q_ASSERT(invertible);
-    return viewportToDocument.map(QPointF(viewportPoint));
-}
-
-QPointF transformMoveEndForDocumentDelta(const ImageCanvas &canvas,
-                                         const QPoint &pressPoint,
-                                         const QPointF &documentDelta)
-{
-    return canvas.mapDocumentToViewport(
-        documentPositionForButtonPoint(canvas, pressPoint) + documentDelta);
-}
 
 } // namespace
 
@@ -1394,7 +1401,7 @@ void CanvasTests::transformMoveSnapsAndControlBypasses()
 
 void CanvasTests::transformMoveUsesWholePixelLattice()
 {
-    ImageCanvas canvas;
+    TransformTestCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1414,16 +1421,16 @@ void CanvasTests::transformMoveUsesWholePixelLattice()
     QCoreApplication::processEvents();
 
     QSignalSpy changed(&canvas, &ImageCanvas::transformDragChanged);
-    QWidget *viewport = canvas.viewport();
-    // Preserve the fractional move coordinate produced by the canvas transform.
-    // The press point is deliberately well inside the selection so QtTest's
-    // platform-stable integer button injection cannot land on a pivot/edge zone.
-    const QPoint start = canvas.mapDocumentToViewport(QPointF(30.0, 49.0)).toPoint();
-    const QPointF fractionalEnd = transformMoveEndForDocumentDelta(
-        canvas, start, QPointF(5.4, 3.6));
+    // Exercise the transform handler/math contract directly. QtTest's native
+    // button injection is still covered by neighbouring tests, while these
+    // fractional transform regressions must not depend on platform event
+    // rounding in the Windows, X11 or Wayland plugins.
+    const QPointF start = canvas.mapDocumentToViewport(QPointF(30.0, 49.0));
+    const QPointF fractionalEnd =
+        canvas.mapDocumentToViewport(QPointF(35.4, 52.6));
 
-    sendTransformButton(viewport, QEvent::MouseButtonPress, start);
-    sendTransformMove(viewport, fractionalEnd, Qt::NoModifier);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, start);
+    canvas.sendDirectTransformMove(fractionalEnd);
     QVERIFY(changed.count() >= 1);
     const QTransform snapped = qvariant_cast<QTransform>(changed.constLast().at(0));
     const QRectF snappedBounds = snapped.mapRect(selection);
@@ -1433,21 +1440,21 @@ void CanvasTests::transformMoveUsesWholePixelLattice()
     QVERIFY(std::abs(snappedBounds.top() - 44.0) < 0.01);
     QVERIFY(std::abs(snapped.dx() - 5.75) < 0.01);
     QVERIFY(std::abs(snapped.dy() - 3.75) < 0.01);
-    sendTransformButton(viewport, QEvent::MouseButtonRelease, fractionalEnd);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, fractionalEnd);
 
     changed.clear();
     canvas.setTransformSelectionBounds(selection);
-    sendTransformButton(viewport, QEvent::MouseButtonPress, start);
-    sendTransformMove(viewport, fractionalEnd, Qt::ControlModifier);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, start);
+    canvas.sendDirectTransformMove(fractionalEnd, Qt::ControlModifier);
     QVERIFY(changed.count() >= 1);
     const QTransform free = qvariant_cast<QTransform>(changed.constLast().at(0));
-    QVERIFY(std::abs(free.dx() - 5.4) < 0.05);
-    QVERIFY(std::abs(free.dy() - 3.6) < 0.05);
+    QVERIFY(std::abs(free.dx() - 5.4) < 0.01);
+    QVERIFY(std::abs(free.dy() - 3.6) < 0.01);
     const QRectF freeBounds = free.mapRect(selection);
     QVERIFY(!isPixelBoundaryCoordinate(freeBounds.left()));
     QVERIFY(!isPixelBoundaryCoordinate(freeBounds.top()));
-    sendTransformButton(viewport, QEvent::MouseButtonRelease, fractionalEnd,
-                        Qt::ControlModifier);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, fractionalEnd,
+                                     Qt::ControlModifier);
 }
 
 void CanvasTests::transformResizeSnapsDraggedEdge()
@@ -1522,7 +1529,7 @@ void CanvasTests::transformResizeUsesPixelBoundaryLattice()
 
 void CanvasTests::persistentTransformGesturesCompose()
 {
-    ImageCanvas canvas;
+    TransformTestCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1536,24 +1543,21 @@ void CanvasTests::persistentTransformGesturesCompose()
     canvas.setTransformSelectionBounds(QRectF(20.0, 40.0, 40.0, 30.0));
     QCoreApplication::processEvents();
 
-    QWidget *viewport = canvas.viewport();
-    // QtTest button positions are integer viewport coordinates. At 100% zoom,
-    // forming each release from the actual injected press pixel preserves the
-    // intended integer document delta even when a platform style gives the
-    // viewport a half-pixel document origin.
-    const QPoint firstStart = canvas.mapDocumentToViewport(
-        QPointF(30.0, 48.0)).toPoint();
-    const QPoint firstEnd = firstStart + QPoint(20, 0);
-    sendTransformButton(viewport, QEvent::MouseButtonPress, firstStart);
-    sendTransformMove(viewport, QPointF(firstEnd), Qt::NoModifier);
-    sendTransformButton(viewport, QEvent::MouseButtonRelease, firstEnd);
+    const QPointF firstStart =
+        canvas.mapDocumentToViewport(QPointF(30.0, 48.0));
+    const QPointF firstEnd =
+        canvas.mapDocumentToViewport(QPointF(50.0, 48.0));
+    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, firstStart);
+    canvas.sendDirectTransformMove(firstEnd);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, firstEnd);
 
-    const QPoint secondStart = canvas.mapDocumentToViewport(
-        QPointF(50.0, 48.0)).toPoint();
-    const QPoint secondEnd = secondStart + QPoint(10, 10);
-    sendTransformButton(viewport, QEvent::MouseButtonPress, secondStart);
-    sendTransformMove(viewport, QPointF(secondEnd), Qt::NoModifier);
-    sendTransformButton(viewport, QEvent::MouseButtonRelease, secondEnd);
+    const QPointF secondStart =
+        canvas.mapDocumentToViewport(QPointF(50.0, 48.0));
+    const QPointF secondEnd =
+        canvas.mapDocumentToViewport(QPointF(60.0, 58.0));
+    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, secondStart);
+    canvas.sendDirectTransformMove(secondEnd);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, secondEnd);
 
     const QTransform accumulated = canvas.transformSessionTransform();
     QVERIFY(std::abs(accumulated.dx() - 30.0) < 0.01);
@@ -1562,7 +1566,7 @@ void CanvasTests::persistentTransformGesturesCompose()
 
 void CanvasTests::transformPivotMovesWithoutChangingSessionMatrix()
 {
-    ImageCanvas canvas;
+    TransformTestCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1576,26 +1580,24 @@ void CanvasTests::transformPivotMovesWithoutChangingSessionMatrix()
     QCoreApplication::processEvents();
 
     QSignalSpy pivotChanged(&canvas, &ImageCanvas::transformPivotChanged);
-    QWidget *viewport = canvas.viewport();
-    const QPoint pivotStart = canvas.mapDocumentToViewport(
-        QPointF(40.0, 55.0)).toPoint();
-    const QPoint pivotEnd = pivotStart + QPoint(10, 10);
-    const QPointF expectedPivot = documentPositionForButtonPoint(canvas, pivotEnd);
-    sendTransformButton(viewport, QEvent::MouseButtonPress, pivotStart);
-    sendTransformMove(viewport, QPointF(pivotEnd), Qt::NoModifier);
-    sendTransformButton(viewport, QEvent::MouseButtonRelease, pivotEnd);
+    const QPointF pivotStart =
+        canvas.mapDocumentToViewport(QPointF(40.0, 55.0));
+    const QPointF pivotEnd =
+        canvas.mapDocumentToViewport(QPointF(50.0, 65.0));
+    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, pivotStart);
+    canvas.sendDirectTransformMove(pivotEnd);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, pivotEnd);
 
     QVERIFY(pivotChanged.count() >= 1);
     const QPointF pivot = canvas.transformPivot();
-    QVERIFY(QLineF(pivot, expectedPivot).length() < 0.01);
-    QVERIFY(QLineF(pivot, QPointF(50.0, 65.0)).length() < 1.0);
+    QVERIFY(std::abs(pivot.x() - 50.0) < 0.01);
+    QVERIFY(std::abs(pivot.y() - 65.0) < 0.01);
     QVERIFY(canvas.transformSessionTransform().isIdentity());
 }
 
-
 void CanvasTests::transformScaleMovesPivotWithContent()
 {
-    ImageCanvas canvas;
+    TransformTestCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1609,30 +1611,24 @@ void CanvasTests::transformScaleMovesPivotWithContent()
     canvas.setTransformSelectionBounds(QRectF(20.0, 40.0, 40.0, 30.0));
     QCoreApplication::processEvents();
 
-    QWidget *viewport = canvas.viewport();
-    const QPoint scaleStart = canvas.mapDocumentToViewport(
-        QPointF(60.0, 55.0)).toPoint();
-    const QPoint scaleEnd = scaleStart + QPoint(20, 0);
-    const QPointF releaseDocument = documentPositionForButtonPoint(canvas, scaleEnd);
-    sendTransformButton(viewport, QEvent::MouseButtonPress, scaleStart);
-    sendTransformMove(viewport, QPointF(scaleEnd), Qt::NoModifier);
-    sendTransformButton(viewport, QEvent::MouseButtonRelease, scaleEnd);
+    const QPointF scaleStart =
+        canvas.mapDocumentToViewport(QPointF(60.0, 55.0));
+    const QPointF scaleEnd =
+        canvas.mapDocumentToViewport(QPointF(80.0, 55.0));
+    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, scaleStart);
+    canvas.sendDirectTransformMove(scaleEnd);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, scaleEnd);
 
-    const QRectF selection(20.0, 40.0, 40.0, 30.0);
-    const QRectF scaled = canvas.transformSessionTransform().mapRect(selection);
-    const double expectedWidth = releaseDocument.x() - selection.left();
-    const double expectedScale = expectedWidth / selection.width();
-    const double expectedPivotX = selection.left()
-        + (selection.center().x() - selection.left()) * expectedScale;
-    QVERIFY(std::abs(scaled.width() - expectedWidth) < 0.01);
-    QVERIFY(std::abs(scaled.width() - 60.0) < 1.0);
-    QVERIFY(std::abs(canvas.transformPivot().x() - expectedPivotX) < 0.01);
+    const QRectF scaled = canvas.transformSessionTransform().mapRect(
+        QRectF(20.0, 40.0, 40.0, 30.0));
+    QVERIFY(std::abs(scaled.width() - 60.0) < 0.01);
+    QVERIFY(std::abs(canvas.transformPivot().x() - 50.0) < 0.01);
     QVERIFY(std::abs(canvas.transformPivot().y() - 55.0) < 0.01);
 }
 
 void CanvasTests::transformModesRestrictHandlesWithoutResettingSession()
 {
-    ImageCanvas canvas;
+    TransformTestCanvas canvas;
     canvas.setRulersVisible(false);
     canvas.resize(400, 300);
     canvas.show();
@@ -1647,14 +1643,14 @@ void CanvasTests::transformModesRestrictHandlesWithoutResettingSession()
     canvas.setTransformSelectionBounds(selection);
     QCoreApplication::processEvents();
 
-    QWidget *viewport = canvas.viewport();
     canvas.setTransformInteractionMode(CanvasTransformInteractionMode::Rotate);
-    const QPoint moveStart = canvas.mapDocumentToViewport(
-        QPointF(58.0, 55.0)).toPoint();
-    const QPoint moveEnd = moveStart + QPoint(10, 0);
-    sendTransformButton(viewport, QEvent::MouseButtonPress, moveStart);
-    sendTransformMove(viewport, QPointF(moveEnd), Qt::NoModifier);
-    sendTransformButton(viewport, QEvent::MouseButtonRelease, moveEnd);
+    const QPointF moveStart =
+        canvas.mapDocumentToViewport(QPointF(58.0, 55.0));
+    const QPointF moveEnd =
+        canvas.mapDocumentToViewport(QPointF(68.0, 55.0));
+    canvas.sendDirectTransformButton(QEvent::MouseButtonPress, moveStart);
+    canvas.sendDirectTransformMove(moveEnd);
+    canvas.sendDirectTransformButton(QEvent::MouseButtonRelease, moveEnd);
     const QTransform moved = canvas.transformSessionTransform();
     QVERIFY(std::abs(moved.mapRect(selection).width() - selection.width()) < 0.01);
     QVERIFY(std::abs(moved.dx() - 10.0) < 0.01);
@@ -1662,9 +1658,12 @@ void CanvasTests::transformModesRestrictHandlesWithoutResettingSession()
     canvas.setTransformInteractionMode(CanvasTransformInteractionMode::Scale);
     QSignalSpy started(&canvas, &ImageCanvas::transformDragStarted);
     // The rotation handle is 28 viewport pixels above the transformed top edge.
-    const QPoint rotationHandle = canvas.mapDocumentToViewport(QPointF(50.0, 12.0)).toPoint();
-    QTest::mousePress(viewport, Qt::LeftButton, Qt::NoModifier, rotationHandle);
-    QTest::mouseRelease(viewport, Qt::LeftButton, Qt::NoModifier, rotationHandle);
+    const QPoint rotationHandle =
+        canvas.mapDocumentToViewport(QPointF(50.0, 12.0)).toPoint();
+    QTest::mousePress(canvas.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      rotationHandle);
+    QTest::mouseRelease(canvas.viewport(), Qt::LeftButton, Qt::NoModifier,
+                        rotationHandle);
     QCOMPARE(started.count(), 0);
     QCOMPARE(canvas.transformSessionTransform(), moved);
 }

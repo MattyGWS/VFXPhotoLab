@@ -39,3 +39,5 @@ Thumbs.db
 /Windows-build-diagnostics-*/
 /windows-build-failure-*
 /windows-diagnostics-*/
+/windows-diagnostics-*.zip
+/Windows-build-diagnostics-*.zip
