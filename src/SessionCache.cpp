@@ -504,9 +504,12 @@ bool readImage(QDataStream &stream, QImage *image, QString *errorMessage)
         setError(errorMessage, QStringLiteral("The session cache image layout is inconsistent."));
         return false;
     }
-    // Pixel padding is never persisted, so initialise it rather than writing
-    // arbitrary process memory to the private cache.
-    restored.fill(0);
+    // Pixel padding is never persisted. QImage::fill() only guarantees pixel
+    // values, not row-padding bytes, so zero the complete allocation before
+    // copying the active row payload back in.
+    std::memset(restored.bits(),
+                0,
+                static_cast<std::size_t>(restored.sizeInBytes()));
 
     quint64 destinationOffset = 0;
     for (quint32 chunkIndex = 0; chunkIndex < chunkCount; ++chunkIndex) {
