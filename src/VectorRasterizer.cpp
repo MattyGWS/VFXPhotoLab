@@ -702,22 +702,42 @@ bool buildExactColourCarrier(const QImage &colourStraight,
             const double styleAlpha = sourceCoverage > 0.0
                 ? std::clamp(semanticAlpha / sourceCoverage, 0.0, 1.0)
                 : 0.0;
+
+            // Preserve the ordinary RGBA8 raster's authored RGB when it differs
+            // from the canonical RGBA64 semantic raster only by normal final
+            // quantisation. At antialiased fill/stroke blend pixels Qt's 8- and
+            // 16-bit painters can disagree by much more than one code value; in
+            // that case use canonical RGB so the 8-bit/GPU carrier and 16-bit CPU
+            // reference propagate the same semantic colour rather than amplifying
+            // a format-specific edge blend throughout the Feather halo.
+            std::array<uchar, 3> canonicalRgb {};
+            if (styleStraight.depth() > 32) {
+                const QRgba64 canonical = reinterpret_cast<const QRgba64 *>(
+                    styleStraight.constScanLine(sy))[sx];
+                canonicalRgb = {
+                    static_cast<uchar>(std::lround(canonical.red() / 257.0)),
+                    static_cast<uchar>(std::lround(canonical.green() / 257.0)),
+                    static_cast<uchar>(std::lround(canonical.blue() / 257.0))
+                };
+            } else {
+                const uchar *canonical = styleStraight.constScanLine(sy) + sx * 4;
+                canonicalRgb = {canonical[0], canonical[1], canonical[2]};
+            }
+            const bool exactEightBitRgbIsCanonical =
+                std::abs(static_cast<int>(sourcePixel[0]) - canonicalRgb[0]) <= 1
+                && std::abs(static_cast<int>(sourcePixel[1]) - canonicalRgb[1]) <= 1
+                && std::abs(static_cast<int>(sourcePixel[2]) - canonicalRgb[2]) <= 1;
+
             uchar *target = output.scanLine(oy) + ox * 4;
-            if (sourcePixel[3] > 0 || semanticAlpha <= 0.0) {
+            if ((sourcePixel[3] > 0 || semanticAlpha <= 0.0)
+                && exactEightBitRgbIsCanonical) {
                 target[0] = sourcePixel[0];
                 target[1] = sourcePixel[1];
                 target[2] = sourcePixel[2];
-            } else if (styleStraight.depth() > 32) {
-                const QRgba64 canonical = reinterpret_cast<const QRgba64 *>(
-                    styleStraight.constScanLine(sy))[sx];
-                target[0] = static_cast<uchar>(std::lround(canonical.red() / 257.0));
-                target[1] = static_cast<uchar>(std::lround(canonical.green() / 257.0));
-                target[2] = static_cast<uchar>(std::lround(canonical.blue() / 257.0));
             } else {
-                const uchar *canonical = styleStraight.constScanLine(sy) + sx * 4;
-                target[0] = canonical[0];
-                target[1] = canonical[1];
-                target[2] = canonical[2];
+                target[0] = canonicalRgb[0];
+                target[1] = canonicalRgb[1];
+                target[2] = canonicalRgb[2];
             }
             target[3] = static_cast<uchar>(std::lround(styleAlpha * 255.0));
         }

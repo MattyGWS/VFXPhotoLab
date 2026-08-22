@@ -1429,9 +1429,12 @@ void CanvasTests::transformMoveUsesWholePixelLattice()
     // button injection is still covered by neighbouring tests, while these
     // fractional transform regressions must not depend on platform event
     // rounding in the Windows, X11 or Wayland plugins.
-    const QPointF start = canvas.mapDocumentToViewport(QPointF(30.0, 49.0));
+    // Keep the press clear of the half-pixel guide itself. Guide dragging has
+    // a 7 px hit tolerance and intentionally precedes transform hit-testing;
+    // the guide is a snap target here, not the gesture being exercised.
+    const QPointF start = canvas.mapDocumentToViewport(QPointF(50.0, 50.0));
     const QPointF fractionalEnd =
-        canvas.mapDocumentToViewport(QPointF(35.4, 52.6));
+        canvas.mapDocumentToViewport(QPointF(55.4, 53.6));
 
     ImageCanvasTestPeer::sendTransformButton(canvas, QEvent::MouseButtonPress, start);
     ImageCanvasTestPeer::sendTransformMove(canvas, fractionalEnd);
